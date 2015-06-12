@@ -3,9 +3,6 @@ from twisted.web.xmlrpc import withRequest
 from models import Cracker, Report
 from datetime import datetime
 import time
-from storm.twisted.transact import Transactor
-from storm.twisted.transact import transact
-from twisted.python.threadpool import (ThreadPool)
 
 class Example(xmlrpc.XMLRPC):
     """
@@ -14,27 +11,21 @@ class Example(xmlrpc.XMLRPC):
     crackers=[]
 
     @withRequest
-    @transact
     def xmlrpc_add_hosts(self, request, hosts):
         print("add_hosts({})".format(hosts))
         for host in hosts:
             print("Adding host {}".format(host))
-            try:
-
-                cracker = root.crackers[host]
-            except:
+            candidates = [cracker for cracker in self.crackers if
+                cracker.ip_address == host]
+            if len(candidates)>1:
+                print("Error, {} crackers for host {}!".format(len(candidates), host))
+            elif len(candidates)==1:
+                cracker = candidates[0]
+            else:
                 cracker = Cracker(host)
-            cracker.add_report(host)
-            self.crackers.append(cracker)
+                self.crackers.append(cracker)
+            cracker.add_report(request.getClientIP())
 
-            try:
-                report = root.reports[request.getClientIP()]
-            except:
-                report = Report(request.getClientIP())
-            
-            #report.latest_report_time = datetime.now()
-            #report.latest_total_resiliency = report.latest_report_time - report.first_report_time
-            #report.save()
         return 0
 
     @withRequest
@@ -46,10 +37,12 @@ class Example(xmlrpc.XMLRPC):
         print("returning: {}".format(result))
         return result
 
-    @withRequest
-    def xmlrpc_list_all_hosts(self, request):
+    def xmlrpc_list_all_hosts(self):
         result = [cracker.ip_address for cracker in self.crackers]
         return result
+
+    def xmlrpc_dump_database(self):
+        return self.crackers
 
     @withRequest
     def xmlrpc_ip(self, request):
@@ -77,9 +70,6 @@ class Example(xmlrpc.XMLRPC):
         raise xmlrpc.Fault(123, "The fault procedure is faulty.")
 
 if __name__ == '__main__':
-    threads = ThreadPool(maxthreads=4)
-    transaction = Transactor(threads)
-
     from twisted.internet import reactor
     r = Example()
     reactor.listenTCP(8000, server.Site(r))
