@@ -1,1 +1,3 @@
 *.pyc
+denyhosts.sqlite
+.*.swp
