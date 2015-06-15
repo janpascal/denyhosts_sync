@@ -3,8 +3,10 @@ import sqlite3
 
 from twisted.web import server
 from twisted.enterprise import adbapi
+from twistar.registry import Registry
 
 import views
+import models
 
 if __name__ == '__main__':
     print("Creating tables")
@@ -23,12 +25,12 @@ if __name__ == '__main__':
     db.execute("DROP TABLE IF EXISTS reports")
     db.execute("CREATE TABLE reports(id INTEGER PRIMARY KEY AUTOINCREMENT, cracker_id INTEGER, ip_address TEXT, first_report_time INTEGER, latest_report_time INTEGER)")
     db.close()
-    dbpool = adbapi.ConnectionPool("sqlite3", 'denyhosts.sqlite')
+    Registry.DBPOOL = adbapi.ConnectionPool("sqlite3", 'denyhosts.sqlite')
+    Registry.register(models.Cracker, models.Report)
     from twisted.internet import reactor
-    r = views.Server(dbpool)
+    r = views.Server()
     reactor.listenTCP(8000, server.Site(r))
     print("Starting reactor...")
     reactor.run()
-    dbpool.close()
 
 # vim: tabstop=8 expandtab shiftwidth=4 softtabstop=4
