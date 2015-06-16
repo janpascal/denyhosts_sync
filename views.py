@@ -41,7 +41,7 @@ class Server(xmlrpc.XMLRPC):
                 cracker_ip = str(ipaddr.IPAddress(ip))
             except:
                 print("Illegal host ip address {}".format(ip))
-                continue
+                raise xmlrpc.Fault(101, "Illegal IP address {}.".format(ip))
             #print("Adding host {}".format(cracker_ip))
             cracker = yield Cracker.find(where=['ip_address=?', cracker_ip], limit=1)
             if cracker is None:
@@ -62,8 +62,17 @@ class Server(xmlrpc.XMLRPC):
             resiliency = long(resiliency)
         except:
             print("Illegal arguments to get_new_hosts from client {}".format(request.getClientIP()))
-            returnValue({'timestamp':str(long(time.time())), 'hosts':[]})
+            raise xmlrpc.Fault(102, "Illegal parameters.")
 
+        now = time.time()
+        # refuse timestamps from the future
+        if timestamp > now:
+            print("Illegal timestamp to get_new_hosts from client {}".format(request.getClientIP()))
+            raise xmlrpc.Fault(103, "Illegal timestamp.")
+
+        # TODO: maybe refuse timestamp from far past because it will 
+        # cause much work? OTOH, denyhosts will use timestamp=0 for 
+        # the first run!
         # TODO: check if client IP is a known cracker
 
         result = {}
