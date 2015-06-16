@@ -56,6 +56,16 @@ class Server(xmlrpc.XMLRPC):
     @inlineCallbacks
     def xmlrpc_get_new_hosts(self, request, timestamp, threshold, hosts_added, resiliency):
         print("get_new_hosts({},{},{},{})".format(timestamp, threshold, hosts_added, resiliency))
+        try:
+            timestamp = long(timestamp)
+            threshold = int(threshold)
+            resiliency = long(resiliency)
+        except:
+            print("Illegal arguments to get_new_hosts from client {}".format(request.getClientIP()))
+            returnValue({'timestamp':str(long(time.time())), 'hosts':[]})
+
+        # TODO: check if client IP is a known cracker
+
         result = {}
         result['timestamp'] = str(long(time.time()))
         result['hosts'] = yield models.get_qualifying_crackers(threshold, resiliency, timestamp)
