@@ -1,3 +1,19 @@
+#    denyhosts sync server
+#    Copyright (C) 2015 Jan-Pascal van Best <janpascal@vanbest.org>
+
+#    This program is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU Affero General Public License as published
+#    by the Free Software Foundation, either version 3 of the License, or
+#    (at your option) any later version.
+
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU Affero General Public License for more details.
+
+#    You should have received a copy of the GNU Affero General Public License
+#    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
 import time
 from functools import partial
 
@@ -12,9 +28,6 @@ class Server(xmlrpc.XMLRPC):
     """
     An example object to be published.
     """
-
-    def __init__(self):
-        xmlrpc.XMLRPC.__init__(self)
 
     @withRequest
     @inlineCallbacks
@@ -46,9 +59,6 @@ class Server(xmlrpc.XMLRPC):
         crackers = yield Cracker.all()
         returnValue([c.ip_address for c in crackers])
 
-#    def xmlrpc_dump_database(self):
-#        return self.crackers
-
     @inlineCallbacks
     def xmlrpc_get_cracker_info(self, ip_address):
         #print("Getting info for cracker {}".format(ip_address))
@@ -60,12 +70,5 @@ class Server(xmlrpc.XMLRPC):
         'current_reports']
         report_cols=['ip_address','first_report_time', 'latest_report_time']
         returnValue( [cracker.toHash(cracker_cols), [r.toHash(report_cols) for r in reports]] )
-
-
-    def xmlrpc_fault(self):
-        """
-        Raise a Fault indicating that the procedure should not be used.
-        """
-        raise xmlrpc.Fault(123, "The fault procedure is faulty.")
 
 # vim: tabstop=8 expandtab shiftwidth=4 softtabstop=4
