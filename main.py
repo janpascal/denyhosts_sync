@@ -24,6 +24,8 @@ if __name__ == '__main__':
     db.execute("CREATE INDEX cracker_ip_address ON crackers (ip_address)")
     db.execute("DROP TABLE IF EXISTS reports")
     db.execute("CREATE TABLE reports(id INTEGER PRIMARY KEY AUTOINCREMENT, cracker_id INTEGER, ip_address TEXT, first_report_time INTEGER, latest_report_time INTEGER)")
+    db.execute("DROP INDEX IF EXISTS report_first_time")
+    db.execute("CREATE INDEX report_first_time ON reports (first_report_time)")
     db.close()
     Registry.DBPOOL = adbapi.ConnectionPool("sqlite3", 'denyhosts.sqlite')
     Registry.register(models.Cracker, models.Report)

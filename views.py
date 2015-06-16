@@ -19,9 +19,9 @@ class Server(xmlrpc.XMLRPC):
     @withRequest
     @inlineCallbacks
     def xmlrpc_add_hosts(self, request, hosts):
-        print("add_hosts({})".format(hosts))
+        #print("add_hosts({})".format(hosts))
         for cracker_ip in hosts:
-            print("Adding host {}".format(cracker_ip))
+            #print("Adding host {}".format(cracker_ip))
             cracker = yield Cracker.find(where=['ip_address=?', cracker_ip], limit=1)
             if cracker is None:
                 now = time.time()
@@ -35,9 +35,8 @@ class Server(xmlrpc.XMLRPC):
     @inlineCallbacks
     def xmlrpc_get_new_hosts(self, request, timestamp, threshold, hosts_added, resiliency):
         print("get_new_hosts({},{},{},{})".format(timestamp, threshold, hosts_added, resiliency))
-        #return self.dbpool.runInteraction(self._get_new_hosts, request, timestamp, threshold, hosts_added, resiliency)
         result = {}
-        result['timestamp'] = time.time()
+        result['timestamp'] = str(long(time.time()))
         result['hosts'] = yield models.get_qualifying_crackers(threshold, resiliency, timestamp)
         print("returning: {}".format(result))
         returnValue( result)
@@ -52,11 +51,11 @@ class Server(xmlrpc.XMLRPC):
 
     @inlineCallbacks
     def xmlrpc_get_cracker_info(self, ip_address):
-        print("Getting info for cracker {}".format(ip_address))
+        #print("Getting info for cracker {}".format(ip_address))
         cracker = yield models.get_cracker(ip_address)
-        print("found cracker: {}".format(cracker))
+        #print("found cracker: {}".format(cracker))
         reports = yield cracker.reports.get()
-        print("found reports: {}".format(reports))
+        #print("found reports: {}".format(reports))
         cracker_cols=['ip_address','first_time', 'latest_time', 'total_reports',
         'current_reports']
         report_cols=['ip_address','first_report_time', 'latest_report_time']

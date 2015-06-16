@@ -47,11 +47,13 @@ class Report(DBObject):
         returnValue(self.latest_report_time - cracker.first_report_time)
 
 @inlineCallbacks
-def get_qualifying_crackers(N, T, S1):
+def get_qualifying_crackers(min_reports, min_resilience, previous_timestamp, max_crackers=50):
     # Initial version, see
     # https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=622697
     # for algorithm. 
     # Not complete yet!
+    
+    # This query takes care of conditions (a) and (b)
     cracker_ids = yield Registry.DBPOOL.runQuery("""
             SELECT DISTINCT c.id, c.ip_address 
             FROM crackers c 
@@ -60,15 +62,41 @@ def get_qualifying_crackers(N, T, S1):
                 (c.latest_time - c.first_time >= ?)
                 AND (c.latest_time >= ?)
             ORDER BY c.first_time DESC
-            LIMIT ?
         """, 
-        [N, T, S1, 50])
-    
-    print("Cracker ids:{}".format(cracker_ids))
+        [min_reports, min_resilience, previous_timestamp])
+  
     if cracker_ids is None:
-        returnValue( [])
-    else:
-        returnValue([r[1] for r in cracker_ids])
+        returnValue([])
+
+    result = []
+    for c in cracker_ids:
+        cracker_id = c[0]
+        cracker = yield Cracker.find(cracker_id)
+        print("Examining {}".format(cracker.ip_address))
+        reports = yield cracker.reports.get(orderby="first_report_time ASC")
+        if len(reports)>=min_reports and reports[min_reports-1] >= previous_timestamp: 
+            # condition (c) satisfied
+            print("c")
+            result.append(cracker.ip_address)
+        else:
+            satisfied = False
+            for report in reports:
+                if (not d1_satisfied and 
+                    reports.latest_report_time>=previous_timestamp and
+                    report.latest_report_time-cracker.first_report_time>=min_resilience):
+                    print("d1")
+                    satisfied = True
+                if (report.latest_report_time<=previous_timestamp and 
+                    report.latest_report_time-cracker.first_report_time>=min_resilience):
+                    print("d2 failed")
+                    satisfied = False
+                    break
+            if satisfied:
+                result.append(cracker.ip_address)
+        if len(result)>=max_crackers:
+            break
+
+    returnValue(result)
 
 # vim: tabstop=8 expandtab shiftwidth=4 softtabstop=4
 
