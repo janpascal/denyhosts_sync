@@ -15,7 +15,6 @@
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import time
-from functools import partial
 
 from twistar.dbobject import DBObject
 from twisted.internet.defer import inlineCallbacks, returnValue
@@ -57,6 +56,9 @@ def get_cracker(ip_address):
 class Report(DBObject):
     BELONGSTO=['cracker']
 
+    def __str__(self):
+        return "Report({},{},{},{})".format(self.id,self.ip_address,self.first_report_time,self.latest_report_time)
+
     @inlineCallbacks
     def latest_total_resiliency(self):
         # Fails
@@ -89,27 +91,37 @@ def get_qualifying_crackers(min_reports, min_resilience, previous_timestamp, max
     for c in cracker_ids:
         cracker_id = c[0]
         cracker = yield Cracker.find(cracker_id)
-        print("Examining {}".format(cracker.ip_address))
+        print("Examining cracker:")
+        print(cracker)
         reports = yield cracker.reports.get(orderby="first_report_time ASC")
-        if len(reports)>=min_reports and reports[min_reports-1] >= previous_timestamp: 
+        print("reports:")
+        for r in reports:
+            print("    "+str(r))
+        if (len(reports)>=min_reports and 
+            reports[min_reports-1].first_report_time >= previous_timestamp): 
             # condition (c) satisfied
             print("c")
             result.append(cracker.ip_address)
         else:
+            print("checking (d)...")
             satisfied = False
             for report in reports:
-                if (not d1_satisfied and 
-                    reports.latest_report_time>=previous_timestamp and
-                    report.latest_report_time-cracker.first_report_time>=min_resilience):
-                    print("d1")
+                print("    "+str(report))
+                if (not satisfied and 
+                    report.latest_report_time>=previous_timestamp and
+                    report.latest_report_time-cracker.first_time>=min_resilience):
+                    print("    d1")
                     satisfied = True
                 if (report.latest_report_time<=previous_timestamp and 
-                    report.latest_report_time-cracker.first_report_time>=min_resilience):
-                    print("d2 failed")
+                    report.latest_report_time-cracker.first_time>=min_resilience):
+                    print("    d2 failed")
                     satisfied = False
                     break
             if satisfied:
+                print("Appending {}".format(cracker.ip_address))
                 result.append(cracker.ip_address)
+            else:
+                print("    skipping")
         if len(result)>=max_crackers:
             break
 

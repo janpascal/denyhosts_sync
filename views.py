@@ -15,11 +15,14 @@
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import time
-from functools import partial
+
+import ipaddr
 
 from twisted.web import xmlrpc 
 from twisted.web.xmlrpc import withRequest
 from twisted.internet.defer import inlineCallbacks, returnValue
+
+import ipaddr
 
 import models
 from models import Cracker, Report
@@ -33,7 +36,12 @@ class Server(xmlrpc.XMLRPC):
     @inlineCallbacks
     def xmlrpc_add_hosts(self, request, hosts):
         #print("add_hosts({})".format(hosts))
-        for cracker_ip in hosts:
+        for ip in hosts:
+            try:
+                cracker_ip = str(ipaddr.IPAddress(ip))
+            except:
+                print("Illegal host ip address {}".format(ip))
+                continue
             #print("Adding host {}".format(cracker_ip))
             cracker = yield Cracker.find(where=['ip_address=?', cracker_ip], limit=1)
             if cracker is None:
@@ -60,7 +68,12 @@ class Server(xmlrpc.XMLRPC):
         returnValue([c.ip_address for c in crackers])
 
     @inlineCallbacks
-    def xmlrpc_get_cracker_info(self, ip_address):
+    def xmlrpc_get_cracker_info(self, ip):
+        try:
+            ip_address = str(ipaddr.IPAddress(ip))
+        except:
+            print("Illegal host ip address {}".format(ip))
+            returnValue([])
         #print("Getting info for cracker {}".format(ip_address))
         cracker = yield models.get_cracker(ip_address)
         #print("found cracker: {}".format(cracker))

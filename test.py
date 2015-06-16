@@ -5,7 +5,7 @@ import time
 s = xmlrpclib.ServerProxy('http://localhost:8000/xmlrpc/')
 
 print("Adding two hosts")
-print s.add_hosts(["test.example.org","test2.example.org"])
+print s.add_hosts(["127.0.0.3", "test.example.org","test2.example.org"])
 print("Adding one host")
 print s.add_hosts(["test4.example.org"])
 
@@ -22,5 +22,5 @@ print s.list_all_hosts()
 # #print s.dump_database()
 # 
 print("Cracker info for test.example.org:")
-print s.get_cracker_info("test.example.org")
+print s.get_cracker_info("127.0.0.3")
 # 
