@@ -32,17 +32,27 @@ class Server(xmlrpc.XMLRPC):
     An example object to be published.
     """
 
+    def is_valid_ip_address(self, ip_address):
+        try:
+            ip = ipaddr.IPAddress(ip_address)
+        except:
+            return False
+        if (ip.is_reserved or ip.is_private or ip.is_loopback or
+            ip.is_unspecified or ip.is_multicast or
+            ip.is_link_local):
+            return False
+        return True
+
     @withRequest
     @inlineCallbacks
     def xmlrpc_add_hosts(self, request, hosts):
         #print("add_hosts({})".format(hosts))
-        for ip in hosts:
-            try:
-                cracker_ip = str(ipaddr.IPAddress(ip))
-            except:
-                print("Illegal host ip address {}".format(ip))
-                raise xmlrpc.Fault(101, "Illegal IP address {}.".format(ip))
-            #print("Adding host {}".format(cracker_ip))
+        for cracker_ip in hosts:
+            if not self.is_valid_ip_address(cracker_ip):
+                print("Illegal host ip address {}".format(cracker_ip))
+                raise xmlrpc.Fault(101, "Illegal IP address \"{}\".".format(cracker_ip))
+            print("Adding report for {} from {}".format(cracker_ip,
+            request.getClientIP()))
             cracker = yield Cracker.find(where=['ip_address=?', cracker_ip], limit=1)
             if cracker is None:
                 now = time.time()
@@ -88,13 +98,14 @@ class Server(xmlrpc.XMLRPC):
 
     @inlineCallbacks
     def xmlrpc_get_cracker_info(self, ip):
-        try:
-            ip_address = str(ipaddr.IPAddress(ip))
-        except:
+        if not self.is_valid_ip_address(ip):
             print("Illegal host ip address {}".format(ip))
             returnValue([])
         #print("Getting info for cracker {}".format(ip_address))
-        cracker = yield models.get_cracker(ip_address)
+        cracker = yield models.get_cracker(ip)
+        if cracker is None:
+            returnValue([])
+
         #print("found cracker: {}".format(cracker))
         reports = yield cracker.reports.get()
         #print("found reports: {}".format(reports))
