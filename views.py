@@ -26,13 +26,15 @@ import ipaddr
 
 import models
 from models import Cracker, Report
+import config
 
 class Server(xmlrpc.XMLRPC):
     """
     An example object to be published.
     """
 
-    def is_valid_ip_address(self, ip_address):
+    @staticmethod
+    def is_valid_ip_address(ip_address):
         try:
             ip = ipaddr.IPAddress(ip_address)
         except:
@@ -100,17 +102,17 @@ class Server(xmlrpc.XMLRPC):
     def xmlrpc_get_cracker_info(self, ip):
         if not self.is_valid_ip_address(ip):
             print("Illegal host ip address {}".format(ip))
-            returnValue([])
+            raise xmlrpc.Fault(101, "Illegal IP address \"{}\".".format(ip))
         #print("Getting info for cracker {}".format(ip_address))
         cracker = yield models.get_cracker(ip)
         if cracker is None:
+            raise xmlrpc.Fault(104, "Cracker {} unknown".format(ip))
             returnValue([])
 
         #print("found cracker: {}".format(cracker))
         reports = yield cracker.reports.get()
         #print("found reports: {}".format(reports))
-        cracker_cols=['ip_address','first_time', 'latest_time', 'total_reports',
-        'current_reports']
+        cracker_cols=['ip_address','first_time', 'latest_time', 'total_reports', 'current_reports']
         report_cols=['ip_address','first_report_time', 'latest_report_time']
         returnValue( [cracker.toHash(cracker_cols), [r.toHash(report_cols) for r in reports]] )
 

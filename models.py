@@ -67,10 +67,8 @@ class Report(DBObject):
 
 @inlineCallbacks
 def get_qualifying_crackers(min_reports, min_resilience, previous_timestamp, max_crackers=50):
-    # Initial version, see
-    # https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=622697
-    # for algorithm. 
-    # Not complete yet!
+    # Thank to Anne Bezemer for the algorithm in this function. 
+    # See https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=622697
     
     # This query takes care of conditions (a) and (b)
     cracker_ids = yield Registry.DBPOOL.runQuery("""
