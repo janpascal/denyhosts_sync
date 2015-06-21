@@ -19,6 +19,7 @@ import ConfigParser
 def read_config(filename):
     global dbtype, dbparams
     global maintenance_interval, expiry_days
+    global max_reported_crackers
 
     _config = ConfigParser.SafeConfigParser()
     _config.read(filename)
@@ -30,4 +31,6 @@ def read_config(filename):
 
     maintenance_interval = _config.getint("maintenance", "interval_seconds")
     expiry_days = _config.getfloat("maintenance", "expiry_days")
+
+    max_reported_crackers = _config.getint("sync", "max_reported_crackers")
 

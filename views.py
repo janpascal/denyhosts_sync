@@ -89,7 +89,7 @@ class Server(xmlrpc.XMLRPC):
 
         result = {}
         result['timestamp'] = str(long(time.time()))
-        result['hosts'] = yield models.get_qualifying_crackers(threshold, resiliency, timestamp)
+        result['hosts'] = yield models.get_qualifying_crackers(threshold, resiliency, timestamp, config.max_reported_crackers)
         print("returning: {}".format(result))
         returnValue( result)
 
