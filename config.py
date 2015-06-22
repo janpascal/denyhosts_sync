@@ -17,15 +17,18 @@
 import ConfigParser
 
 def read_config(filename):
-    global dbtype, dbparams
+    global dbtype, dbparams, clean_database
     global maintenance_interval, expiry_days
     global max_reported_crackers
+    global logfile
 
     _config = ConfigParser.SafeConfigParser()
     _config.read(filename)
 
     dbtype = _config.get("database", "type")
-    dbparams = {key: value for (key,value) in _config.items("database") if key != "type"}
+    clean_database = _config.getboolean("database", "clean_database")
+    dbparams = {key: value for (key,value) in _config.items("database") 
+        if key != "type" and key != "clean_database"}
     if dbtype=="sqlite3":
         dbparams["check_same_thread"]=False
 

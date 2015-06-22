@@ -89,8 +89,8 @@ def create_database():
 if __name__ == '__main__':
     config.read_config("denyhosts_sync_server.conf")
     # TODO
-    # if config.clean_database:
-    create_database()
+    if config.clean_database:
+        create_database()
 
     Registry.DBPOOL = adbapi.ConnectionPool(config.dbtype, **config.dbparams)
     Registry.register(models.Cracker, models.Report)
