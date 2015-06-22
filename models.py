@@ -15,6 +15,7 @@
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import time
+import logging
 
 from twistar.dbobject import DBObject
 from twisted.internet.defer import inlineCallbacks, returnValue
@@ -85,41 +86,42 @@ def get_qualifying_crackers(min_reports, min_resilience, previous_timestamp, max
     if cracker_ids is None:
         returnValue([])
 
+    # Now look for conditions (c) and (d)
     result = []
     for c in cracker_ids:
         cracker_id = c[0]
         cracker = yield Cracker.find(cracker_id)
-        print("Examining cracker:")
-        print(cracker)
+        logging.debug("Examining cracker:")
+        logging.debug(cracker)
         reports = yield cracker.reports.get(orderby="first_report_time ASC")
-        print("reports:")
+        logging.debug("reports:")
         for r in reports:
-            print("    "+str(r))
+            logging.debug("    "+str(r))
         if (len(reports)>=min_reports and 
             reports[min_reports-1].first_report_time >= previous_timestamp): 
             # condition (c) satisfied
-            print("c")
+            logging.debug("c")
             result.append(cracker.ip_address)
         else:
-            print("checking (d)...")
+            logging.debug("checking (d)...")
             satisfied = False
             for report in reports:
-                print("    "+str(report))
+                logging.debug("    "+str(report))
                 if (not satisfied and 
                     report.latest_report_time>=previous_timestamp and
                     report.latest_report_time-cracker.first_time>=min_resilience):
-                    print("    d1")
+                    logging.debug("    d1")
                     satisfied = True
                 if (report.latest_report_time<=previous_timestamp and 
                     report.latest_report_time-cracker.first_time>=min_resilience):
-                    print("    d2 failed")
+                    logging.debug("    d2 failed")
                     satisfied = False
                     break
             if satisfied:
-                print("Appending {}".format(cracker.ip_address))
+                logging.debug("Appending {}".format(cracker.ip_address))
                 result.append(cracker.ip_address)
             else:
-                print("    skipping")
+                logging.debug("    skipping")
         if len(result)>=max_crackers:
             break
 

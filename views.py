@@ -15,8 +15,7 @@
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import time
-
-import ipaddr
+import logging
 
 from twisted.web import xmlrpc 
 from twisted.web.xmlrpc import withRequest
@@ -48,12 +47,12 @@ class Server(xmlrpc.XMLRPC):
     @withRequest
     @inlineCallbacks
     def xmlrpc_add_hosts(self, request, hosts):
-        #print("add_hosts({})".format(hosts))
+        logging.info("add_hosts({}) from {}".format(hosts, request.getClientIP()))
         for cracker_ip in hosts:
             if not self.is_valid_ip_address(cracker_ip):
-                print("Illegal host ip address {}".format(cracker_ip))
+                logging.warning("Illegal host ip address {}".format(cracker_ip))
                 raise xmlrpc.Fault(101, "Illegal IP address \"{}\".".format(cracker_ip))
-            print("Adding report for {} from {}".format(cracker_ip,
+            logging.info("Adding report for {} from {}".format(cracker_ip,
             request.getClientIP()))
             cracker = yield Cracker.find(where=['ip_address=?', cracker_ip], limit=1)
             if cracker is None:
@@ -67,19 +66,20 @@ class Server(xmlrpc.XMLRPC):
     @withRequest
     @inlineCallbacks
     def xmlrpc_get_new_hosts(self, request, timestamp, threshold, hosts_added, resiliency):
-        print("get_new_hosts({},{},{},{})".format(timestamp, threshold, hosts_added, resiliency))
+        logging.info("get_new_hosts({},{},{},{}) from {}".format(timestamp, threshold, 
+            hosts_added, resiliency, request.getClientIP()))
         try:
             timestamp = long(timestamp)
             threshold = int(threshold)
             resiliency = long(resiliency)
         except:
-            print("Illegal arguments to get_new_hosts from client {}".format(request.getClientIP()))
+            logging.warning("Illegal arguments to get_new_hosts from client {}".format(request.getClientIP()))
             raise xmlrpc.Fault(102, "Illegal parameters.")
 
         now = time.time()
         # refuse timestamps from the future
         if timestamp > now:
-            print("Illegal timestamp to get_new_hosts from client {}".format(request.getClientIP()))
+            logging.warning("Illegal timestamp to get_new_hosts from client {}".format(request.getClientIP()))
             raise xmlrpc.Fault(103, "Illegal timestamp.")
 
         # TODO: maybe refuse timestamp from far past because it will 
@@ -90,7 +90,7 @@ class Server(xmlrpc.XMLRPC):
         result = {}
         result['timestamp'] = str(long(time.time()))
         result['hosts'] = yield models.get_qualifying_crackers(threshold, resiliency, timestamp, config.max_reported_crackers)
-        print("returning: {}".format(result))
+        logging.debug("returning: {}".format(result))
         returnValue( result)
 
     @inlineCallbacks
@@ -101,17 +101,17 @@ class Server(xmlrpc.XMLRPC):
     @inlineCallbacks
     def xmlrpc_get_cracker_info(self, ip):
         if not self.is_valid_ip_address(ip):
-            print("Illegal host ip address {}".format(ip))
+            logging.warning("Illegal host ip address {}".format(ip))
             raise xmlrpc.Fault(101, "Illegal IP address \"{}\".".format(ip))
-        #print("Getting info for cracker {}".format(ip_address))
+        #logging.info("Getting info for cracker {}".format(ip_address))
         cracker = yield models.get_cracker(ip)
         if cracker is None:
             raise xmlrpc.Fault(104, "Cracker {} unknown".format(ip))
             returnValue([])
 
-        #print("found cracker: {}".format(cracker))
+        #logging.info("found cracker: {}".format(cracker))
         reports = yield cracker.reports.get()
-        #print("found reports: {}".format(reports))
+        #logging.info("found reports: {}".format(reports))
         cracker_cols=['ip_address','first_time', 'latest_time', 'total_reports', 'current_reports']
         report_cols=['ip_address','first_report_time', 'latest_report_time']
         returnValue( [cracker.toHash(cracker_cols), [r.toHash(report_cols) for r in reports]] )

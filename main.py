@@ -18,6 +18,7 @@
 
 import sqlite3
 import time
+import logging
 
 from twisted.web import server
 from twisted.enterprise import adbapi
@@ -42,7 +43,7 @@ import config
 # TODO How memory intensive is this? Better by direct SQL queries?
 @inlineCallbacks
 def perform_maintenance():
-    print("Starting maintenance job...")
+    logging.info("Starting maintenance job...")
     crackers = yield Cracker.all()
     if crackers is None:
         returnValue(1)
@@ -53,21 +54,21 @@ def perform_maintenance():
         reports = yield cracker.reports.get()
         for report in reports:
             if report.latest_report_time < limit:
-                print("Maintenance: removing report from {} for cracker {}".format(report.ip_address, cracker.ip_address))
+                logging.info("Maintenance: removing report from {} for cracker {}".format(report.ip_address, cracker.ip_address))
                 cracker.current_reports -= 1
                 yield report.cracker.clear()
                 yield report.delete()
                 yield cracker.save()
             # TODO remove reports by identified crackers
         if cracker.current_reports == 0:
-            print("Maintenance: removing cracker {}".format(cracker.ip_address))
+            logging.info("Maintenance: removing cracker {}".format(cracker.ip_address))
             yield cracker.delete()
 
     returnValue(0)
              
 
 def create_database():
-    print("Creating tables")
+    logging.info("Creating tables")
     db = sqlite3.connect("denyhosts.sqlite")
     db.execute("DROP TABLE IF EXISTS crackers")
     db.execute("""CREATE TABLE crackers (
@@ -88,6 +89,10 @@ def create_database():
 
 if __name__ == '__main__':
     config.read_config("denyhosts_sync_server.conf")
+    logging.basicConfig(filename=config.logfile, 
+        level=logging.DEBUG,
+        format="%(asctime)s %(levelname)-8s %(message)s",
+        datefmt="%Y-%m-%d %H:%M")
     # TODO
     if config.clean_database:
         create_database()
@@ -103,7 +108,8 @@ if __name__ == '__main__':
     l.start(config.maintenance_interval, now=False) 
     
     # Start reactor
-    print("Starting reactor...")
+    logging.info("Starting reactor...")
+    logging.getLogger().handlers[0].flush()
     reactor.run()
 
 # vim: tabstop=8 expandtab shiftwidth=4 softtabstop=4

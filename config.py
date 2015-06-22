@@ -36,4 +36,5 @@ def read_config(filename):
     expiry_days = _config.getfloat("maintenance", "expiry_days")
 
     max_reported_crackers = _config.getint("sync", "max_reported_crackers")
+    logfile = _config.get("logging", "logfile")
 
