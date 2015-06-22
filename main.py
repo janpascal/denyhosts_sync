@@ -101,7 +101,7 @@ if __name__ == '__main__':
     Registry.register(models.Cracker, models.Report)
     from twisted.internet import reactor
     r = views.Server()
-    reactor.listenTCP(8000, server.Site(r))
+    reactor.listenTCP(config.listen_port, server.Site(r))
 
     # Set up maintenance job
     l = task.LoopingCall(perform_maintenance)

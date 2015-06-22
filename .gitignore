@@ -1,3 +1,4 @@
 *.pyc
 denyhosts.sqlite
 .*.swp
+log.txt

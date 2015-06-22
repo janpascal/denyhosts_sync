@@ -21,6 +21,7 @@ def read_config(filename):
     global maintenance_interval, expiry_days
     global max_reported_crackers
     global logfile
+    global listen_port
 
     _config = ConfigParser.SafeConfigParser()
     _config.read(filename)
@@ -36,5 +37,7 @@ def read_config(filename):
     expiry_days = _config.getfloat("maintenance", "expiry_days")
 
     max_reported_crackers = _config.getint("sync", "max_reported_crackers")
+    listen_port = _config.getint("sync", "listen_port")
+
     logfile = _config.get("logging", "logfile")
 
