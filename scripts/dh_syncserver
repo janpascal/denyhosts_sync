@@ -37,7 +37,7 @@ from dh_syncserver import initdb
              
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="DenyHosts sync server")
-    parser.add_argument("-c", "--config", default="/etc/denyhosts_sync_server.conf", help="Configuration file")
+    parser.add_argument("-c", "--config", default="/etc/dh_syncserver.conf", help="Configuration file")
     parser.add_argument("--recreate-database", action='store_true', help="Wipe and recreate the database")
     args = parser.parse_args()
 

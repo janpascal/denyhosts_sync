@@ -5,3 +5,5 @@ log.txt
 _trial_temp/
 test.py
 build/
+dist/
+MANIFEST

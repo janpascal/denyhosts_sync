@@ -4,6 +4,8 @@ from distutils.core import setup
 
 from dh_syncserver import version
 
+etcpath = "/etc"
+
 setup(name='dh_syncserver',
       version=version,
       description='DenyHosts Synchronisation Server',
@@ -13,5 +15,9 @@ setup(name='dh_syncserver',
       packages=['dh_syncserver'],
       requires=["twisted.enterprise.adbapi", "twistar"],
       scripts=['scripts/dh_syncserver'],
+      data_files=[
+        (etcpath, glob("dh_syncserver.conf")),
+      ],
       license="AGPL",
+
      )
