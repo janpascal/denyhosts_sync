@@ -82,6 +82,12 @@ class Server(xmlrpc.XMLRPC):
             logging.warning("Illegal timestamp to get_new_hosts from client {}".format(request.getClientIP()))
             raise xmlrpc.Fault(103, "Illegal timestamp.")
 
+        for host in hosts_added:
+            if not self.is_valid_ip_address(host):
+                logging.warning("Illegal host ip address {}".format(host))
+                raise xmlrpc.Fault(101, "Illegal IP address \"{}\".".format(host))
+
+
         # TODO: maybe refuse timestamp from far past because it will 
         # cause much work? OTOH, denyhosts will use timestamp=0 for 
         # the first run!
@@ -89,7 +95,9 @@ class Server(xmlrpc.XMLRPC):
 
         result = {}
         result['timestamp'] = str(long(time.time()))
-        result['hosts'] = yield models.get_qualifying_crackers(threshold, resiliency, timestamp, config.max_reported_crackers)
+        result['hosts'] = yield models.get_qualifying_crackers(
+                threshold, resiliency, timestamp, 
+                config.max_reported_crackers, set(hosts_added))
         logging.debug("returning: {}".format(result))
         returnValue( result)
 

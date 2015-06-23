@@ -67,10 +67,11 @@ class Report(DBObject):
         returnValue(self.latest_report_time - cracker.first_report_time)
 
 @inlineCallbacks
-def get_qualifying_crackers(min_reports, min_resilience, previous_timestamp, max_crackers=50):
+def get_qualifying_crackers(min_reports, min_resilience, previous_timestamp,
+        max_crackers, latest_added_hosts):
     # Thank to Anne Bezemer for the algorithm in this function. 
     # See https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=622697
-    
+   
     # This query takes care of conditions (a) and (b)
     cracker_ids = yield Registry.DBPOOL.runQuery("""
             SELECT DISTINCT c.id, c.ip_address 
@@ -90,6 +91,9 @@ def get_qualifying_crackers(min_reports, min_resilience, previous_timestamp, max
     result = []
     for c in cracker_ids:
         cracker_id = c[0]
+        if c[1] in latest_added_hosts:
+            logging.debug("Skipping {}, just reported by client".format(c[1]))
+            continue
         cracker = yield Cracker.find(cracker_id)
         logging.debug("Examining cracker:")
         logging.debug(cracker)
