@@ -28,45 +28,12 @@ from twisted.internet.defer import inlineCallbacks, returnValue
 
 from twistar.registry import Registry
 
-import views
-import models
-from models import Cracker, Report
-import config
-import initdb
-
-# From algorithm by Anne Bezemer, see https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=622697
-# Expiry/maintenance every hour/day:
-#   remove reports with .latestreporttime older than (for example) 1 month
-#     and only update cracker.currentreports
-#   remove reports that were reported by what we now "reliably" know to
-#     be crackers themselves
-#   remove crackers that have no reports left
-
-# TODO How memory intensive is this? Better by direct SQL queries?
-@inlineCallbacks
-def perform_maintenance():
-    logging.info("Starting maintenance job...")
-    crackers = yield Cracker.all()
-    if crackers is None:
-        returnValue(1)
-
-    now = time.time()
-    limit = now - config.expiry_days * 24 * 3600 
-    for cracker in crackers:
-        reports = yield cracker.reports.get()
-        for report in reports:
-            if report.latest_report_time < limit:
-                logging.info("Maintenance: removing report from {} for cracker {}".format(report.ip_address, cracker.ip_address))
-                cracker.current_reports -= 1
-                yield report.cracker.clear()
-                yield report.delete()
-                yield cracker.save()
-            # TODO remove reports by identified crackers
-        if cracker.current_reports == 0:
-            logging.info("Maintenance: removing cracker {}".format(cracker.ip_address))
-            yield cracker.delete()
-
-    returnValue(0)
+from dh_syncserver import views
+from dh_syncserver import models
+from dh_syncserver import controllers
+from dh_syncserver.models import Cracker, Report
+from dh_syncserver import config
+from dh_syncserver import initdb
              
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="DenyHosts sync server")
@@ -91,7 +58,7 @@ if __name__ == '__main__':
     reactor.listenTCP(config.listen_port, server.Site(r))
 
     # Set up maintenance job
-    l = task.LoopingCall(perform_maintenance)
+    l = task.LoopingCall(controllers.perform_maintenance)
     l.start(config.maintenance_interval, now=False) 
     
     # Start reactor
