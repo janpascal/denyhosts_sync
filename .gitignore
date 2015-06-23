@@ -2,3 +2,5 @@
 denyhosts.sqlite
 .*.swp
 log.txt
+_trial_temp
+test.py

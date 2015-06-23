@@ -60,12 +60,6 @@ class Report(DBObject):
     def __str__(self):
         return "Report({},{},{},{})".format(self.id,self.ip_address,self.first_report_time,self.latest_report_time)
 
-    @inlineCallbacks
-    def latest_total_resiliency(self):
-        # Fails
-        cracker = yield self.cracker.get()
-        returnValue(self.latest_report_time - cracker.first_report_time)
-
 @inlineCallbacks
 def get_qualifying_crackers(min_reports, min_resilience, previous_timestamp,
         max_crackers, latest_added_hosts):
