@@ -16,6 +16,34 @@
 
 import ConfigParser
 
+def _get(config, section, option, default=None):
+    try:
+        result = config.get(section, option)
+    except ConfigParser.NoOptionError:
+        result = default
+    return result
+
+def _getint(config, section, option, default=None):
+    try:
+        result = config.getint(section, option)
+    except ConfigParser.NoOptionError:
+        result = default
+    return result
+
+def _getboolean(config, section, option, default=None):
+    try:
+        result = config.getboolean(section, option)
+    except ConfigParser.NoOptionError:
+        result = default
+    return result
+
+def _getfloat(config, section, option, default=None):
+    try:
+        result = config.getfloat(section, option)
+    except ConfigParser.NoOptionError:
+        result = default
+    return result
+
 def read_config(filename):
     global dbtype, dbparams, clean_database
     global maintenance_interval, expiry_days
@@ -27,20 +55,23 @@ def read_config(filename):
     _config = ConfigParser.SafeConfigParser()
     _config.read(filename)
 
-    dbtype = _config.get("database", "type")
-    clean_database = _config.getboolean("database", "clean_database")
-    dbparams = {key: value for (key,value) in _config.items("database") 
-        if key != "type" and key != "clean_database"}
+    dbtype = _get(_config, "database", "type", "sqlite3")
+    clean_database = _getboolean(_config, "database", "clean_database", False)
+    dbparams = {
+        key: value 
+        for (key,value) in _config.items("database") 
+        if key != "type" and key != "clean_database"
+    }
     if dbtype=="sqlite3":
         dbparams["check_same_thread"]=False
         if "database" not in dbparams:
             dbparams["database"] = "/var/lib/dh_syncserver/denyhosts.sqlite"
 
-    maintenance_interval = _config.getint("maintenance", "interval_seconds")
-    expiry_days = _config.getfloat("maintenance", "expiry_days")
+    maintenance_interval = _getint(_config, "maintenance", "interval_seconds", 3600)
+    expiry_days = _getfloat(_config, "maintenance", "expiry_days", 30)
 
-    max_reported_crackers = _config.getint("sync", "max_reported_crackers")
-    listen_port = _config.getint("sync", "listen_port")
-    legacy_server = _config.get("sync", "legacy_server")
+    max_reported_crackers = _getint(_config, "sync", "max_reported_crackers", 50)
+    listen_port = _getint(_config, "sync", "listen_port", 9911)
+    legacy_server = _get(_config, "sync", "legacy_server", "http://xmlrpx.denyhosts.net:9911")
 
-    logfile = _config.get("logging", "logfile")
+    logfile = _get(_config, "logging", "logfile", "/var/log/dh-syncserver.log")
