@@ -16,35 +16,39 @@
 
 import logging
 import time
+import xmlrpclib
 
 from twisted.internet.defer import inlineCallbacks, returnValue
+from twisted.internet.threads  import deferToThread
+
 from twistar.registry import Registry
 
 import config
 import models
-from models import Cracker, Report
+from models import Cracker, Report, Legacy
 
 def get_cracker(ip_address):
     return Cracker.find(where=["ip_address=?",ip_address], limit=1)
 
 @inlineCallbacks
-def add_report_to_cracker(cracker, client_ip):
-    now = time.time()
+def add_report_to_cracker(cracker, client_ip, when=None):
+    if when is None:
+        when = time.time()
     report = yield Report.find(
         where=["cracker_id=? AND ip_address=?", cracker.id, client_ip],
         limit=1
     )
     if report is None:
-        report = Report(ip_address=client_ip, first_report_time=now, latest_report_time=now)
+        report = Report(ip_address=client_ip, first_report_time=when, latest_report_time=when)
         yield report.save()
         cracker.current_reports += 1
         yield report.cracker.set(cracker)
     else:
-        report.latest_report_time = now
+        report.latest_report_time = when
         yield report.save()
     
     cracker.total_reports += 1
-    cracker.latest_time = now
+    cracker.latest_time = when
 
     yield cracker.save()
 
@@ -113,7 +117,16 @@ def get_qualifying_crackers(min_reports, min_resilience, previous_timestamp,
         if len(result)>=max_crackers:
             break
 
+    if len(result) < max_crackers:
+        # Add results from legacy server
+        extras = yield Legacy.find(where=["retrieved_time>?", previous_timestamp],
+            orderby="retrieved_time DESC", limit=max_crackers-len(result))
+        result = result + [extra.ip_address for extra in extras]
+
+    logging.debug("Returning {} hosts".format(len(result)))
     returnValue(result)
+
+# Periodical database maintenance
 # From algorithm by Anne Bezemer, see https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=622697
 # Expiry/maintenance every hour/day:
 #   remove reports with .latestreporttime older than (for example) 1 month
@@ -126,26 +139,68 @@ def get_qualifying_crackers(min_reports, min_resilience, previous_timestamp,
 @inlineCallbacks
 def perform_maintenance():
     logging.info("Starting maintenance job...")
-    crackers = yield Cracker.all()
-    if crackers is None:
-        returnValue(1)
 
     now = time.time()
     limit = now - config.expiry_days * 24 * 3600 
-    for cracker in crackers:
-        reports = yield cracker.reports.get()
-        for report in reports:
-            if report.latest_report_time < limit:
-                logging.info("Maintenance: removing report from {} for cracker {}".format(report.ip_address, cracker.ip_address))
-                cracker.current_reports -= 1
-                yield report.cracker.clear()
-                yield report.delete()
-                yield cracker.save()
-            # TODO remove reports by identified crackers
-        if cracker.current_reports == 0:
-            logging.info("Maintenance: removing cracker {}".format(cracker.ip_address))
-            yield cracker.delete()
+    
+    crackers = yield Cracker.all()
+    if crackers is not None:
+        for cracker in crackers:
+            reports = yield cracker.reports.get()
+            for report in reports:
+                if report.latest_report_time < limit:
+                    logging.info("Maintenance: removing report from {} for cracker {}".format(report.ip_address, cracker.ip_address))
+                    cracker.current_reports -= 1
+                    yield report.cracker.clear()
+                    yield report.delete()
+                    yield cracker.save()
+                # TODO remove reports by identified crackers
+            if cracker.current_reports == 0:
+                logging.info("Maintenance: removing cracker {}".format(cracker.ip_address))
+                yield cracker.delete()
 
+    legacy_reports = yield Legacy.find(where=["retrieved_time<?", limit])
+    if legacy_reports is not None:
+        for legacy in legacy_reports:
+            yield legacy.delete()
+
+    returnValue(0)
+
+# TODO write to file or database
+last_legacy_sync_time = 0
+
+@inlineCallbacks
+def download_from_legacy_server():
+    global last_legacy_sync_time
+    logging.info("Downloading hosts from legacy server...")
+
+    if config.legacy_server is None:
+        logging.debug("No legacy server configured, skipping")
+        returnValue(0)
+
+    try:
+        server = yield deferToThread(xmlrpclib.ServerProxy, config.legacy_server)
+
+        # TODO config
+        response = yield deferToThread(server.get_new_hosts, 
+            last_legacy_sync_time, 3, [], 18000)
+        # Todo write to file or to database
+        last_legacy_sync_time = response["timestamp"]
+        now = time.time()
+        logging.debug("Got {} hosts from legacy server".format(len(response["hosts"])))
+        for host in response["hosts"]:
+            legacy = yield Legacy.find(where=["ip_address=?",host], limit=1)
+            if legacy is None:
+                logging.debug("New host from legacy server: {}".format(host))
+                legacy = Legacy(ip_address=host, retrieved_time=now)
+            else:
+                logging.debug("Known host from legacy server: {}".format(host))
+                legacy.retrieved_time = now
+            yield legacy.save()
+    except Exception, e:
+        logging.error("Error retrieving info from legacy server", exc_info=True)
+
+    logging.info("Done downloading hosts from legacy server.")
     returnValue(0)
 
 # vim: tabstop=8 expandtab shiftwidth=4 softtabstop=4

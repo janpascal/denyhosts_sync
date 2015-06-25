@@ -22,6 +22,7 @@ def read_config(filename):
     global max_reported_crackers
     global logfile
     global listen_port
+    global legacy_server
 
     _config = ConfigParser.SafeConfigParser()
     _config.read(filename)
@@ -40,5 +41,6 @@ def read_config(filename):
 
     max_reported_crackers = _config.getint("sync", "max_reported_crackers")
     listen_port = _config.getint("sync", "listen_port")
+    legacy_server = _config.get("sync", "legacy_server")
 
     logfile = _config.get("logging", "logfile")

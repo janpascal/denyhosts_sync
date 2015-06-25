@@ -48,4 +48,15 @@ def initdb():
         txn.execute("DROP INDEX IF EXISTS report_cracker_first")
         txn.execute("CREATE INDEX report_cracker_first ON reports (cracker_id, first_report_time)")
 
+        txn.execute("DROP TABLE IF EXISTS legacy")
+        txn.execute("""CREATE TABLE legacy(
+            id INTEGER PRIMARY KEY AUTOINCREMENT, 
+            ip_address TEXT, 
+            retrieved_time INTEGER
+        )""")
+        txn.execute("DROP INDEX IF EXISTS legacy_ip")
+        txn.execute("CREATE UNIQUE INDEX legacy_ip ON legacy (ip_address)")
+        txn.execute("DROP INDEX IF EXISTS legacy_retrieved")
+        txn.execute("CREATE INDEX legacy_retrieved ON legacy (retrieved_time)")
+
     return Registry.DBPOOL.runInteraction(run_initdb)

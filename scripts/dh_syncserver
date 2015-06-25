@@ -61,6 +61,10 @@ if __name__ == '__main__':
     l = task.LoopingCall(controllers.perform_maintenance)
     l.start(config.maintenance_interval, now=False) 
     
+    # Set up legacy sync job
+    l = task.LoopingCall(controllers.download_from_legacy_server)
+    l.start(60, now=True) 
+    
     # Start reactor
     logging.info("Starting reactor...")
     logging.getLogger().handlers[0].flush()

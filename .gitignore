@@ -2,6 +2,7 @@
 denyhosts.sqlite
 .*.swp
 log.txt
+dh_syncserver.log
 _trial_temp/
 test.py
 build/

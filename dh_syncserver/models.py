@@ -33,4 +33,8 @@ class Report(DBObject):
     def __str__(self):
         return "Report({},{},{},{})".format(self.id,self.ip_address,self.first_report_time,self.latest_report_time)
 
+class Legacy(DBObject):
+    TABLENAME="legacy"
+    pass
+
 # vim: tabstop=8 expandtab shiftwidth=4 softtabstop=4
