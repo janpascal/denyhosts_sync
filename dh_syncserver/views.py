@@ -60,7 +60,7 @@ class Server(xmlrpc.XMLRPC):
                 now = time.time()
                 cracker = Cracker(ip_address=cracker_ip, first_time=now, latest_time=now, total_reports=0, current_reports=0)
                 yield cracker.save()
-            yield add_report_to_cracker(cracker, request.getClientIP())
+            yield controllers.add_report_to_cracker(cracker, request.getClientIP())
         returnValue(0)
 
     @withRequest
