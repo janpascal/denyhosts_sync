@@ -31,10 +31,21 @@ def initdb():
             current_reports INTEGER
         )""")
         txn.execute("DROP INDEX IF EXISTS cracker_ip_address")
-        txn.execute("CREATE INDEX cracker_ip_address ON crackers (ip_address)")
+        txn.execute("CREATE UNIQUE INDEX cracker_ip_address ON crackers (ip_address)")
+
         txn.execute("DROP TABLE IF EXISTS reports")
-        txn.execute("CREATE TABLE reports(id INTEGER PRIMARY KEY AUTOINCREMENT, cracker_id INTEGER, ip_address TEXT, first_report_time INTEGER, latest_report_time INTEGER)")
+        txn.execute("""CREATE TABLE reports(
+            id INTEGER PRIMARY KEY AUTOINCREMENT, 
+            cracker_id INTEGER, 
+            ip_address TEXT, 
+            first_report_time INTEGER, 
+            latest_report_time INTEGER
+        )""")
         txn.execute("DROP INDEX IF EXISTS report_first_time")
         txn.execute("CREATE INDEX report_first_time ON reports (first_report_time)")
+        txn.execute("DROP INDEX IF EXISTS report_cracker_ip")
+        txn.execute("CREATE UNIQUE INDEX report_cracker_ip ON reports (cracker_id, ip_address)")
+        txn.execute("DROP INDEX IF EXISTS report_cracker_first")
+        txn.execute("CREATE INDEX report_cracker_first ON reports (cracker_id, first_report_time)")
 
     return Registry.DBPOOL.runInteraction(run_initdb)
