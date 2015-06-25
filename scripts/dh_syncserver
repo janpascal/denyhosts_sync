@@ -63,7 +63,7 @@ if __name__ == '__main__':
     
     # Set up legacy sync job
     l = task.LoopingCall(controllers.download_from_legacy_server)
-    l.start(60, now=True) 
+    l.start(config.legacy_frequency, now=True) 
     
     # Start reactor
     logging.info("Starting reactor...")

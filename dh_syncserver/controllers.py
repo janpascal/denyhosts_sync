@@ -183,7 +183,8 @@ def download_from_legacy_server():
 
         # TODO config
         response = yield deferToThread(server.get_new_hosts, 
-            last_legacy_sync_time, 3, [], 18000)
+            last_legacy_sync_time, config.legacy_threshold, [],
+            config.legacy_resiliency)
         # Todo write to file or to database
         last_legacy_sync_time = response["timestamp"]
         now = time.time()

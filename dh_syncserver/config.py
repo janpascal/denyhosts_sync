@@ -51,6 +51,8 @@ def read_config(filename):
     global logfile
     global listen_port
     global legacy_server
+    global legacy_frequency
+    global legacy_threshold, legacy_resiliency
 
     _config = ConfigParser.SafeConfigParser()
     _config.read(filename)
@@ -73,5 +75,8 @@ def read_config(filename):
     max_reported_crackers = _getint(_config, "sync", "max_reported_crackers", 50)
     listen_port = _getint(_config, "sync", "listen_port", 9911)
     legacy_server = _get(_config, "sync", "legacy_server", "http://xmlrpx.denyhosts.net:9911")
+    legacy_frequency = _getint(_config, "sync", "legacy_frequency", 480)
+    legacy_threshold = _getint(_config, "sync", "legacy_threshold", 3)
+    legacy_resiliency = _getint(_config, "sync", "legacy_resiliency", 18000)
 
     logfile = _get(_config, "logging", "logfile", "/var/log/dh-syncserver.log")
