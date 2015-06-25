@@ -32,6 +32,8 @@ def read_config(filename):
         if key != "type" and key != "clean_database"}
     if dbtype=="sqlite3":
         dbparams["check_same_thread"]=False
+        if "database" not in dbparams:
+            dbparams["database"] = "/var/lib/dh_syncserver/denyhosts.sqlite"
 
     maintenance_interval = _config.getint("maintenance", "interval_seconds")
     expiry_days = _config.getfloat("maintenance", "expiry_days")
@@ -40,4 +42,3 @@ def read_config(filename):
     listen_port = _config.getint("sync", "listen_port")
 
     logfile = _config.get("logging", "logfile")
-
