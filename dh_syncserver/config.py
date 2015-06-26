@@ -15,6 +15,7 @@
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import ConfigParser
+import logging
 
 def _get(config, section, option, default=None):
     try:
@@ -49,6 +50,7 @@ def read_config(filename):
     global maintenance_interval, expiry_days
     global max_reported_crackers
     global logfile
+    global loglevel
     global listen_port
     global legacy_server
     global legacy_frequency
@@ -81,3 +83,12 @@ def read_config(filename):
     legacy_resiliency = _getint(_config, "sync", "legacy_resiliency", 18000)
 
     logfile = _get(_config, "logging", "logfile", "/var/log/dh-syncserver.log")
+    loglevel = _get(_config, "logging", "loglevel", "INFO")
+    try:
+        loglevel = int(loglevel)
+    except ValueError:
+        try:
+            loglevel = logging.__dict__[loglevel]
+        except KeyError:
+            print("Illegal log level {}".format(loglevel))
+            loglevel = logging.INFO

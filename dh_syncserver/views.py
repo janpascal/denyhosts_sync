@@ -29,10 +29,6 @@ import config
 import controllers
 import utils
 
-class MockRequest():
-    def getClientIP(self):
-        return "192.192.192.192"
-
 class Server(xmlrpc.XMLRPC):
     """
     An example object to be published.

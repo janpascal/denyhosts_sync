@@ -44,7 +44,7 @@ if __name__ == '__main__':
     config.read_config(args.config)
 
     logging.basicConfig(filename=config.logfile, 
-        level=logging.DEBUG,
+        level=config.loglevel,
         format="%(asctime)s %(levelname)-8s %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S")
 
