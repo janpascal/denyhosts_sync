@@ -39,6 +39,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="DenyHosts sync server")
     parser.add_argument("-c", "--config", default="/etc/dh_syncserver.conf", help="Configuration file")
     parser.add_argument("--recreate-database", action='store_true', help="Wipe and recreate the database")
+    parser.add_argument("--evolve-database", action='store_true', help="Evolve the database to the latest schema version")
     args = parser.parse_args()
 
     config.read_config(args.config)
@@ -51,7 +52,11 @@ if __name__ == '__main__':
     Registry.DBPOOL = adbapi.ConnectionPool(config.dbtype, **config.dbparams)
     Registry.register(models.Cracker, models.Report)
     if config.clean_database or args.recreate_database:
+        initdb.remove_tables()
         initdb.initdb()
+
+    if args.evolve_database:
+        initdb.evolve_database()
 
     from twisted.internet import reactor
     r = views.Server()
