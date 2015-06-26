@@ -46,7 +46,7 @@ def _getfloat(config, section, option, default=None):
     return result
 
 def read_config(filename):
-    global dbtype, dbparams, clean_database
+    global dbtype, dbparams
     global maintenance_interval, expiry_days
     global max_reported_crackers
     global logfile
@@ -60,11 +60,10 @@ def read_config(filename):
     _config.read(filename)
 
     dbtype = _get(_config, "database", "type", "sqlite3")
-    clean_database = _getboolean(_config, "database", "clean_database", False)
     dbparams = {
         key: value 
         for (key,value) in _config.items("database") 
-        if key != "type" and key != "clean_database"
+        if key != "type"
     }
     if dbtype=="sqlite3":
         dbparams["check_same_thread"] = False

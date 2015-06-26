@@ -51,24 +51,29 @@ if __name__ == '__main__':
 
     Registry.DBPOOL = adbapi.ConnectionPool(config.dbtype, **config.dbparams)
     Registry.register(models.Cracker, models.Report)
-    if config.clean_database or args.recreate_database:
-        initdb.remove_tables()
-        initdb.initdb()
+
+    single_shot = False
+
+    if args.recreate_database:
+        single_shot = True
+        initdb.clean_database().addCallback(lambda _:reactor.stop())
 
     if args.evolve_database:
-        initdb.evolve_database()
+        single_shot = True
+        initdb.evolve_database().addCallback(lambda _:reactor.stop())
 
     from twisted.internet import reactor
-    r = views.Server()
-    reactor.listenTCP(config.listen_port, server.Site(r))
+    if not single_shot:
+        r = views.Server()
+        reactor.listenTCP(config.listen_port, server.Site(r))
 
-    # Set up maintenance job
-    l = task.LoopingCall(controllers.perform_maintenance)
-    l.start(config.maintenance_interval, now=False) 
-    
-    # Set up legacy sync job
-    l = task.LoopingCall(controllers.download_from_legacy_server)
-    l.start(config.legacy_frequency, now=True) 
+        # Set up maintenance job
+        l = task.LoopingCall(controllers.perform_maintenance)
+        l.start(config.maintenance_interval, now=False) 
+        
+        # Set up legacy sync job
+        l = task.LoopingCall(controllers.download_from_legacy_server)
+        l.start(config.legacy_frequency, now=True) 
     
     # Start reactor
     logging.info("Starting reactor...")

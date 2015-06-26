@@ -21,19 +21,18 @@ from twisted.internet.defer import inlineCallbacks, returnValue
 _schema_version = 1
 
 def _remove_tables(txn):
+    print("Removing all data from database and removing tables")
     txn.execute("DROP TABLE IF EXISTS info")
     txn.execute("DROP TABLE IF EXISTS crackers")
     txn.execute("DROP TABLE IF EXISTS reports")
 
-def remove_tables():
-    return Registry.DBPOOL.runInteraction(_remove_tables)
-
 def _initdb(txn):
+    print("Creating tables")
     txn.execute("""CREATE TABLE info (
         `key` TEXT PRIMARY KEY,
         `value` TEXT
     )""")
-    txn.execute('INSERT INTO info VALUES ("schema_version", ?)', _schema_version)
+    txn.execute('INSERT INTO info VALUES ("schema_version", ?)', str(_schema_version))
     txn.execute('INSERT INTO info VALUES ("last_legacy_sync", 0)')
 
     txn.execute("""CREATE TABLE crackers (
@@ -65,10 +64,16 @@ def _initdb(txn):
     )""")
     txn.execute("CREATE UNIQUE INDEX legacy_ip ON legacy (ip_address)")
     txn.execute("CREATE INDEX legacy_retrieved ON legacy (retrieved_time)")
+    print("Database tables created")
 
 def initdb():
-    logging.info("Creating tables")
     return Registry.DBPOOL.runInteraction(_initdb)
+
+@inlineCallbacks
+def clean_database():
+    yield Registry.DBPOOL.runInteraction(_remove_tables)
+    yield Registry.DBPOOL.runInteraction(_initdb)
+    returnValue(0)
 
 def _evolve_database(txn):
     try:
@@ -77,15 +82,16 @@ def _evolve_database(txn):
         if result is not None:
             current_version = int(result[0])
         else:
-            logging.warning("No schema version in database")
+            print("No schema version in database")
             current_version = 0
     except:
-        logging.warning("No schema version in database")
+        print("No schema version in database")
         current_version = 0
 
+    print("Current database schema is version {}".format(current_version))
 
     if current_version < 1:
-        logging.info("Evolving database to version 1")
+        print("Evolving database to version 1")
         txn.execute("""CREATE TABLE info (
             `key` TEXT PRIMARY KEY,
             `value` TEXT
@@ -94,8 +100,12 @@ def _evolve_database(txn):
         txn.execute('INSERT INTO info VALUES ("last_legacy_sync", 0)')
 
     if current_version > _schema_version:
-        logging.warning("Illegal database schema {}".format(current_version))
+        print("Illegal database schema {}".format(current_version))
+
+    txn.execute('UPDATE info SET `value`=? WHERE `key`="schema_version"', str(_schema_version))
+
+    print("Updated database schema, current version is {}".format(_schema_version))
 
 def evolve_database():
-    logging.info("Evolving database")
+    print("Evolving database")
     return Registry.DBPOOL.runInteraction(_evolve_database)
