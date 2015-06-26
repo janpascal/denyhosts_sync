@@ -65,7 +65,8 @@ def read_config(filename):
         if key != "type" and key != "clean_database"
     }
     if dbtype=="sqlite3":
-        dbparams["check_same_thread"]=False
+        dbparams["check_same_thread"] = False
+        dbparams["cp_max"] = 1
         if "database" not in dbparams:
             dbparams["database"] = "/var/lib/dh_syncserver/denyhosts.sqlite"
 
@@ -74,8 +75,8 @@ def read_config(filename):
 
     max_reported_crackers = _getint(_config, "sync", "max_reported_crackers", 50)
     listen_port = _getint(_config, "sync", "listen_port", 9911)
-    legacy_server = _get(_config, "sync", "legacy_server", "http://xmlrpx.denyhosts.net:9911")
-    legacy_frequency = _getint(_config, "sync", "legacy_frequency", 480)
+    legacy_server = _get(_config, "sync", "legacy_server", "http://xmlrpc.denyhosts.net:9911")
+    legacy_frequency = _getint(_config, "sync", "legacy_frequency", 300)
     legacy_threshold = _getint(_config, "sync", "legacy_threshold", 3)
     legacy_resiliency = _getint(_config, "sync", "legacy_resiliency", 18000)
 

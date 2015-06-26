@@ -20,13 +20,18 @@ import logging
 from twisted.web import xmlrpc 
 from twisted.web.xmlrpc import withRequest
 from twisted.internet.defer import inlineCallbacks, returnValue
-
+from twisted.internet import reactor
 import ipaddr
 
 import models
 from models import Cracker, Report
 import config
 import controllers
+import utils
+
+class MockRequest():
+    def getClientIP(self):
+        return "192.192.192.192"
 
 class Server(xmlrpc.XMLRPC):
     """
@@ -53,14 +58,20 @@ class Server(xmlrpc.XMLRPC):
             if not self.is_valid_ip_address(cracker_ip):
                 logging.warning("Illegal host ip address {} from {}".format(cracker_ip, request.getClientIP()))
                 raise xmlrpc.Fault(101, "Illegal IP address \"{}\".".format(cracker_ip))
-            logging.debug("Adding report for {} from {}".format(cracker_ip,
-            request.getClientIP()))
+
+            logging.debug("Adding report for {} from {}".format(cracker_ip, request.getClientIP()))
+            yield utils.wait_and_lock_host(cracker_ip)
+            
             cracker = yield Cracker.find(where=['ip_address=?', cracker_ip], limit=1)
             if cracker is None:
                 now = time.time()
                 cracker = Cracker(ip_address=cracker_ip, first_time=now, latest_time=now, total_reports=0, current_reports=0)
                 yield cracker.save()
             yield controllers.add_report_to_cracker(cracker, request.getClientIP())
+            
+            utils.unlock_host(cracker_ip)
+            logging.debug("Done adding report for {} from {}".format(cracker_ip,request.getClientIP()))
+
         returnValue(0)
 
     @withRequest
@@ -105,6 +116,25 @@ class Server(xmlrpc.XMLRPC):
     def xmlrpc_list_all_hosts(self):
         crackers = yield Cracker.all()
         returnValue([c.ip_address for c in crackers])
+
+    # Concurrency test. Remove before public installation!
+    @withRequest
+    def xmlrpc_test(self, request):
+        reactor.callLater(1, self.xmlrpc_add_hosts, request, ["1.1.1.1", "2.2.2.2"])
+        reactor.callLater(1, self.xmlrpc_add_hosts, request, ["1.1.1.1", "2.2.2.2"])
+        reactor.callLater(1, self.xmlrpc_add_hosts, request, ["1.1.1.1", "2.2.2.2"])
+        reactor.callLater(1, self.xmlrpc_add_hosts, request, ["1.1.1.1", "2.2.2.2"])
+        reactor.callLater(1, self.xmlrpc_add_hosts, request, ["1.1.1.1", "2.2.2.2"])
+        reactor.callLater(1, self.xmlrpc_add_hosts, request, ["1.1.1.7", "2.2.2.8"])
+        reactor.callLater(1, self.xmlrpc_add_hosts, request, ["1.1.1.7", "2.2.2.8"])
+        reactor.callLater(1, self.xmlrpc_add_hosts, request, ["1.1.1.7", "2.2.2.8"])
+        reactor.callLater(1, self.xmlrpc_add_hosts, request, ["1.1.1.7", "2.2.2.8"])
+        reactor.callLater(1, self.xmlrpc_add_hosts, request, ["1.1.1.7", "2.2.2.8"])
+        return 0
+
+    # For concurrency testing. Remove before public installation!
+    def xmlrpc_maintenance(self):
+        return controllers.perform_maintenance()
 
     @inlineCallbacks
     def xmlrpc_get_cracker_info(self, ip):

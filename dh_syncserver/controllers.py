@@ -26,14 +26,17 @@ from twistar.registry import Registry
 import config
 import models
 from models import Cracker, Report, Legacy
+import utils
 
 def get_cracker(ip_address):
     return Cracker.find(where=["ip_address=?",ip_address], limit=1)
 
+# Note: lock cracker IP first!
 @inlineCallbacks
 def add_report_to_cracker(cracker, client_ip, when=None):
     if when is None:
         when = time.time()
+
     report = yield Report.find(
         where=["cracker_id=? AND ip_address=?", cracker.id, client_ip],
         limit=1
@@ -83,6 +86,8 @@ def get_qualifying_crackers(min_reports, min_resilience, previous_timestamp,
             logging.debug("Skipping {}, just reported by client".format(c[1]))
             continue
         cracker = yield Cracker.find(cracker_id)
+        if cracker is None:
+            continue
         logging.debug("Examining cracker:")
         logging.debug(cracker)
         reports = yield cracker.reports.get(orderby="first_report_time ASC")
@@ -146,6 +151,8 @@ def perform_maintenance():
     crackers = yield Cracker.all()
     if crackers is not None:
         for cracker in crackers:
+            logging.debug("Maintenance {}".format(cracker.ip_address))
+            yield utils.wait_and_lock_host(cracker.ip_address)
             reports = yield cracker.reports.get()
             for report in reports:
                 if report.latest_report_time < limit:
@@ -158,12 +165,15 @@ def perform_maintenance():
             if cracker.current_reports == 0:
                 logging.info("Maintenance: removing cracker {}".format(cracker.ip_address))
                 yield cracker.delete()
+            utils.unlock_host(cracker.ip_address)
+            logging.debug("Maintenance {} done".format(cracker.ip_address))
 
     legacy_reports = yield Legacy.find(where=["retrieved_time<?", limit])
     if legacy_reports is not None:
         for legacy in legacy_reports:
             yield legacy.delete()
 
+    logging.info("Done maintenance job")
     returnValue(0)
 
 # TODO write to file or database
@@ -173,8 +183,9 @@ last_legacy_sync_time = 0
 def download_from_legacy_server():
     global last_legacy_sync_time
     logging.info("Downloading hosts from legacy server...")
+    logging.debug("Sync server: {}".format(config.legacy_server))
 
-    if config.legacy_server is None:
+    if config.legacy_server is None or config.legacy_server == "":
         logging.debug("No legacy server configured, skipping")
         returnValue(0)
 
@@ -199,7 +210,7 @@ def download_from_legacy_server():
                 legacy.retrieved_time = now
             yield legacy.save()
     except Exception, e:
-        logging.error("Error retrieving info from legacy server", exc_info=True)
+        logging.error("Error retrieving info from legacy server {}".format(e))
 
     logging.info("Done downloading hosts from legacy server.")
     returnValue(0)
