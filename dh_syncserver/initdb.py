@@ -34,6 +34,7 @@ def _initdb(txn):
         `value` TEXT
     )""")
     txn.execute('INSERT INTO info VALUES ("schema_version", ?)', _schema_version)
+    txn.execute('INSERT INTO info VALUES ("last_legacy_sync", 0)')
 
     txn.execute("""CREATE TABLE crackers (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -90,6 +91,7 @@ def _evolve_database(txn):
             `value` TEXT
         )""")
         txn.execute('INSERT INTO info VALUES ("schema_version", ?)', str(_schema_version))
+        txn.execute('INSERT INTO info VALUES ("last_legacy_sync", 0)')
 
     if current_version > _schema_version:
         logging.warning("Illegal database schema {}".format(current_version))

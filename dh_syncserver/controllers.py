@@ -176,12 +176,8 @@ def perform_maintenance():
     logging.info("Done maintenance job")
     returnValue(0)
 
-# TODO write to file or database
-last_legacy_sync_time = 0
-
 @inlineCallbacks
 def download_from_legacy_server():
-    global last_legacy_sync_time
     logging.info("Downloading hosts from legacy server...")
     logging.debug("Sync server: {}".format(config.legacy_server))
 
@@ -189,15 +185,20 @@ def download_from_legacy_server():
         logging.debug("No legacy server configured, skipping")
         returnValue(0)
 
+    rows = yield Registry.DBPOOL.runQuery('SELECT `value` FROM info WHERE `key`="last_legacy_sync"')
+    last_legacy_sync_time = int(rows[0][0])
+
     try:
         server = yield deferToThread(xmlrpclib.ServerProxy, config.legacy_server)
 
-        # TODO config
         response = yield deferToThread(server.get_new_hosts, 
             last_legacy_sync_time, config.legacy_threshold, [],
             config.legacy_resiliency)
-        # Todo write to file or to database
-        last_legacy_sync_time = response["timestamp"]
+        try:
+            last_legacy_sync_time = int(response["timestamp"])
+        except:
+            logging.ERROR("Illegal timestamp {} from legacy server".format(response["timestamp"]))
+        Registry.DBPOOL.runOperation('UPDATE info SET `value`=? WHERE `key`="last_legacy_sync"', (str(last_legacy_sync_time),))
         now = time.time()
         logging.debug("Got {} hosts from legacy server".format(len(response["hosts"])))
         for host in response["hosts"]:
@@ -210,7 +211,7 @@ def download_from_legacy_server():
                 legacy.retrieved_time = now
             yield legacy.save()
     except Exception, e:
-        logging.error("Error retrieving info from legacy server {}".format(e))
+        logging.error("Error retrieving info from legacy server: {}".format(e))
 
     logging.info("Done downloading hosts from legacy server.")
     returnValue(0)
