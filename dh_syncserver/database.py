@@ -137,6 +137,28 @@ def clean_database():
     yield Registry.DBPOOL.runInteraction(_evolve_database)
     returnValue(0)
 
+
+@inlineCallbacks
+def check_database_version():
+    try:
+        rows = yield Registry.DBPOOL.runQuery('SELECT `value` FROM `info` WHERE `key`="schema_version"')
+        if rows is not None:
+            current_version = int(rows[0][0])
+        else:
+            print("No schema version in database")
+            current_version = 0
+    except:
+        current_version = 0
+
+    if current_version != _schema_version:
+        logging.debug("Wrong database schema {}, expecting {}, exiting".format(current_version, _schema_version))
+        print("Wrong database schema {}, expecting {}, exiting".format(current_version, _schema_version))
+        from twisted.internet import reactor
+        reactor.stop()
+    else:
+        logging.info("Database schema is up to date (version {})".format(current_version))
+        returnValue(current_version)
+
 # FIXME Not the proper way. What if there's a question mark somewhere
 # else in the query?
 def run_query(query, *args):

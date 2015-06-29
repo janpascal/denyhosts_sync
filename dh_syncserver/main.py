@@ -66,6 +66,9 @@ def run_main():
         database.evolve_database().addCallbacks(stop_reactor, stop_reactor)
 
     from twisted.internet import reactor
+
+    reactor.addSystemEventTrigger("after", "startup", database.check_database_version)
+
     if not single_shot:
         r = views.Server()
         reactor.listenTCP(config.listen_port, server.Site(r))
@@ -76,7 +79,7 @@ def run_main():
         
         # Set up legacy sync job
         l = task.LoopingCall(controllers.download_from_legacy_server)
-        l.start(config.legacy_frequency, now=True) 
+        l.start(config.legacy_frequency, now=False) 
     
     # Start reactor
     logging.info("Starting reactor...")
