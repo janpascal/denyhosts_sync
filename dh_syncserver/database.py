@@ -28,204 +28,114 @@ def _remove_tables(txn):
     txn.execute("DROP TABLE IF EXISTS crackers")
     txn.execute("DROP TABLE IF EXISTS reports")
 
-def _initdb_sqlite3(txn):
-    print("Creating tables")
-    txn.execute("""CREATE TABLE info (
-        `key` CHAR(32) PRIMARY KEY,
-        `value` VARCHAR(255)
-    )""")
-
-    txn.execute('INSERT INTO info (`key`, `value`) VALUES ("schema_version", ?)', (str(_schema_version),))
-    txn.execute('INSERT INTO info (`key`, `value`) VALUES ("last_legacy_sync", 0)')
+def _evolve_database_v0(txn, dbtype):
+    if dbtype=="sqlite3":
+        autoincrement="AUTOINCREMENT"
+    elif dbtype=="MySQLdb":
+        autoincrement="AUTO_INCREMENT"
 
     txn.execute("""CREATE TABLE crackers (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id INTEGER PRIMARY KEY {},
         ip_address CHAR(15), 
         first_time INTEGER, 
         latest_time INTEGER, 
-        resiliency INTEGER,
         total_reports INTEGER, 
         current_reports INTEGER
-    )""")
+    )""".format(autoincrement))
     txn.execute("CREATE UNIQUE INDEX cracker_ip_address ON crackers (ip_address)")
-    txn.execute("CREATE INDEX cracker_qual ON crackers (latest_time, current_reports, resiliency, first_time)")
-    txn.execute("CREATE INDEX cracker_first ON crackers (first_time)")
 
     txn.execute("""CREATE TABLE reports(
-        id INTEGER PRIMARY KEY AUTOINCREMENT, 
+        id INTEGER PRIMARY KEY {}, 
         cracker_id INTEGER, 
         ip_address CHAR(15), 
         first_report_time INTEGER, 
         latest_report_time INTEGER
-    )""")
+    )""".format(autoincrement))
     txn.execute("CREATE INDEX report_first_time ON reports (first_report_time)")
     txn.execute("CREATE UNIQUE INDEX report_cracker_ip ON reports (cracker_id, ip_address)")
     txn.execute("CREATE INDEX report_cracker_first ON reports (cracker_id, first_report_time)")
 
-    txn.execute("DROP TABLE IF EXISTS legacy")
     txn.execute("""CREATE TABLE legacy(
-        id INTEGER PRIMARY KEY AUTOINCREMENT, 
+        id INTEGER PRIMARY KEY {}, 
         ip_address CHAR(15), 
         retrieved_time INTEGER
-    )""")
+    )""".format(autoincrement))
     txn.execute("CREATE UNIQUE INDEX legacy_ip ON legacy (ip_address)")
     txn.execute("CREATE INDEX legacy_retrieved ON legacy (retrieved_time)")
-    print("Database tables created")
 
-def _initdb_MySQLdb(txn):
-    print("Creating tables")
+def _evolve_database_v1(txn, dbtype):
     txn.execute("""CREATE TABLE info (
-        `key` CHAR(32) PRIMARY KEY,
-        `value` VARCHAR(255)
+        `key` TEXT PRIMARY KEY,
+        `value` TEXT
     )""")
+    if dbtype=="sqlite3":
+        txn.execute('INSERT INTO info VALUES ("schema_version", ?)', (str(_schema_version),))
+    elif dbtype=="MySQLdb":
+        txn.execute('INSERT INTO info VALUES ("schema_version", %s)', (str(_schema_version),))
+    txn.execute('INSERT INTO info VALUES ("last_legacy_sync", 0)')
 
-    txn.execute('INSERT INTO info (`key`, `value`) VALUES ("schema_version", %s)', (str(_schema_version),))
-    txn.execute('INSERT INTO info (`key`, `value`) VALUES ("last_legacy_sync", 0)')
-
-    txn.execute("""CREATE TABLE crackers (
-        id INTEGER PRIMARY KEY AUTO_INCREMENT,
-        ip_address CHAR(15), 
-        first_time INTEGER, 
-        latest_time INTEGER, 
-        latest_time INTEGER, 
-        resiliency INTEGER,
-        total_reports INTEGER, 
-        current_reports INTEGER
-    )""")
-    txn.execute("CREATE UNIQUE INDEX cracker_ip_address ON crackers (ip_address)")
-    txn.execute("CREATE INDEX cracker_qual ON crackers (latest_time, current_reports, resiliency, first_time)")
+def _evolve_database_v2(txn, dbtype):
+    txn.execute("ALTER TABLE crackers ADD resiliency INTEGER")
+    txn.execute("CREATE INDEX cracker_qual ON crackers (current_reports, resiliency, latest_time, first_time)")
     txn.execute("CREATE INDEX cracker_first ON crackers (first_time)")
+    txn.execute("UPDATE crackers SET resiliency=latest_time-first_time")
 
-    txn.execute("""CREATE TABLE reports(
-        id INTEGER PRIMARY KEY AUTO_INCREMENT, 
-        cracker_id INTEGER, 
-        ip_address CHAR(15), 
-        first_report_time INTEGER, 
-        latest_report_time INTEGER
-    )""")
-    txn.execute("CREATE INDEX report_first_time ON reports (first_report_time)")
-    txn.execute("CREATE UNIQUE INDEX report_cracker_ip ON reports (cracker_id, ip_address)")
-    txn.execute("CREATE INDEX report_cracker_first ON reports (cracker_id, first_report_time)")
+def _evolve_database_v3(txn, dbtype):
+    if dbtype=="sqlite3":
+        txn.execute("DROP INDEX cracker_qual")
+    elif dbtype=="MySQLdb":
+        txn.execute("ALTER TABLE crackers DROP INDEX cracker_qual")
+    txn.execute("CREATE INDEX cracker_qual ON crackers (latest_time, current_reports, resiliency, first_time)")
 
-    txn.execute("DROP TABLE IF EXISTS legacy")
-    txn.execute("""CREATE TABLE legacy(
-        id INTEGER PRIMARY KEY AUTO_INCREMENT, 
-        ip_address CHAR(15), 
-        retrieved_time INTEGER
-    )""")
-    txn.execute("CREATE UNIQUE INDEX legacy_ip ON legacy (ip_address)")
-    txn.execute("CREATE INDEX legacy_retrieved ON legacy (retrieved_time)")
-    print("Database tables created")
-
-def initdb():
+def _evolve_database(txn):
+    print("Evolving database")
     dbtype = config.dbtype
-    if dbtype == "MySQLdb":
-        return Registry.DBPOOL.runInteraction(_initdb_MySQLdb)
-    elif dbtype == "sqlite3":
-        return Registry.DBPOOL.runInteraction(_initdb_sqlite3)
-    else:
-        print("unsupported database {}".format(dbtype))
+
+    try:
+        txn.execute('SELECT `value` FROM info WHERE `key`="schema_version"')
+        result = txn.fetchone()
+        if result is not None:
+            current_version = int(result[0])
+        else:
+            print("No schema version in database")
+            current_version = 0
+    except:
+        print("No schema version in database")
+        current_version = 0
+
+    print("Current database schema is version {}".format(current_version))
+
+    if current_version < 1:
+        print("Evolving database to version 1")
+        _evolve_database_v0(txn, dbtype)
+        _evolve_database_v1(txn, dbtype)
+
+    if current_version < 2:
+        print("Evolving database to version 2, this may take a while...")
+        _evolve_database_v2(txn, dbtype)
+
+    if current_version < 3:
+        print("Evolving database to version 3, this may take a while...")
+        _evolve_database_v3(txn, dbtype)
+
+    if current_version > _schema_version:
+        print("Illegal database schema {}".format(current_version))
+
+    if dbtype=="sqlite3":
+        txn.execute('UPDATE info SET `value`=? WHERE `key`="schema_version"', (str(_schema_version),))
+    elif dbtype=="MySQLdb":
+        txn.execute('UPDATE info SET `value`=%s WHERE `key`="schema_version"', (str(_schema_version),))
+
+    print("Updated database schema, current version is {}".format(_schema_version))
+
+def evolve_database():
+    return Registry.DBPOOL.runInteraction(_evolve_database)
 
 @inlineCallbacks
 def clean_database():
     yield Registry.DBPOOL.runInteraction(_remove_tables)
-    yield initdb()
+    yield Registry.DBPOOL.runInteraction(_evolve_database)
     returnValue(0)
-
-def _evolve_database_sqlite3(txn):
-    try:
-        txn.execute('SELECT `value` FROM info WHERE `key`="schema_version"')
-        result = txn.fetchone()
-        if result is not None:
-            current_version = int(result[0])
-        else:
-            print("No schema version in database")
-            current_version = 0
-    except:
-        print("No schema version in database")
-        current_version = 0
-
-    print("Current database schema is version {}".format(current_version))
-
-    if current_version < 1:
-        print("Evolving database to version 1")
-        txn.execute("""CREATE TABLE info (
-            `key` TEXT PRIMARY KEY,
-            `value` TEXT
-        )""")
-        txn.execute('INSERT INTO info VALUES ("schema_version", ?)', (str(_schema_version),))
-
-        txn.execute('INSERT INTO info VALUES ("last_legacy_sync", 0)')
-
-    if current_version < 2:
-        print("Evolving database to version 2, this may take a while...")
-        txn.execute("ALTER TABLE crackers ADD resiliency INTEGER")
-        txn.execute("CREATE INDEX cracker_qual ON crackers (current_reports, resiliency, latest_time, first_time)")
-        txn.execute("CREATE INDEX cracker_first ON crackers (first_time)")
-        txn.execute("UPDATE crackers SET resiliency=latest_time-first_time")
-
-    if current_version < 3:
-        print("Evolving database to version 3, this may take a while...")
-        txn.execute("DROP INDEX cracker_qual")
-        txn.execute("CREATE INDEX cracker_qual ON crackers (latest_time, current_reports, resiliency, first_time)")
-
-    if current_version > _schema_version:
-        print("Illegal database schema {}".format(current_version))
-
-    txn.execute('UPDATE info SET `value`=? WHERE `key`="schema_version"', (str(_schema_version),))
-    print("Updated database schema, current version is {}".format(_schema_version))
-
-def _evolve_database_MySQLdb(txn):
-    try:
-        txn.execute('SELECT `value` FROM info WHERE `key`="schema_version"')
-        result = txn.fetchone()
-        if result is not None:
-            current_version = int(result[0])
-        else:
-            print("No schema version in database")
-            current_version = 0
-    except:
-        print("No schema version in database")
-        current_version = 0
-
-    print("Current database schema is version {}".format(current_version))
-
-    if current_version < 1:
-        print("Evolving database to version 1")
-        txn.execute("""CREATE TABLE info (
-            `key` TEXT PRIMARY KEY,
-            `value` TEXT
-        )""")
-        txn.execute('INSERT INTO info VALUES ("schema_version", %s)', (str(_schema_version),))
-        txn.execute('INSERT INTO info VALUES ("last_legacy_sync", 0)')
-
-    if current_version < 2:
-        print("Evolving database to version 2, this may take a while...")
-        txn.execute("ALTER TABLE crackers ADD resiliency INTEGER")
-        txn.execute("CREATE INDEX cracker_qual ON crackers (current_reports, resiliency, latest_time, first_time)")
-        txn.execute("CREATE INDEX cracker_first ON crackers (first_time)")
-        txn.execute("UPDATE crackers SET resiliency=latest_time-first_time")
-
-    if current_version < 3:
-        print("Evolving database to version 3, this may take a while...")
-        txn.execute("ALTER TABLE crackers DROP INDEX cracker_qual")
-        txn.execute("CREATE INDEX cracker_qual ON crackers (latest_time, current_reports, resiliency, first_time)")
-
-    if current_version > _schema_version:
-        print("Illegal database schema {}".format(current_version))
-
-    txn.execute('UPDATE info SET `value`=%s WHERE `key`="schema_version"', (str(_schema_version),))
-    print("Updated database schema, current version is {}".format(_schema_version))
-
-def evolve_database():
-    print("Evolving database")
-    dbtype = config.dbtype
-    if dbtype == "MySQLdb":
-        return Registry.DBPOOL.runInteraction(_evolve_database_MySQLdb)
-    elif dbtype == "sqlite3":
-        return Registry.DBPOOL.runInteraction(_evolve_database_sqlite3)
-    else:
-        print("unsupported database {}".format(dbtype))
 
 # FIXME Not the proper way. What if there's a question mark somewhere
 # else in the query?
