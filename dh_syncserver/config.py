@@ -16,6 +16,7 @@
 
 import ConfigParser
 import logging
+import sys
 
 def _get(config, section, option, default=None):
     try:
@@ -60,6 +61,10 @@ def read_config(filename):
     _config.read(filename)
 
     dbtype = _get(_config, "database", "type", "sqlite3")
+    if dbtype not in ["sqlite3","MySQLdb"]:
+        print("Database type {} not supported, exiting".format(dbtype))
+        sys.exit()
+
     dbparams = {
         key: value 
         for (key,value) in _config.items("database") 
