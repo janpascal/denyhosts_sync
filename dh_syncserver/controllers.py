@@ -51,6 +51,7 @@ def add_report_to_cracker(cracker, client_ip, when=None):
     
     cracker.total_reports += 1
     cracker.latest_time = when
+    cracker.resiliency = when - cracker.first_time
 
     yield cracker.save()
 
@@ -67,9 +68,8 @@ def get_qualifying_crackers(min_reports, min_resilience, previous_timestamp,
     cracker_ids = yield database.run_query("""
             SELECT DISTINCT c.id, c.ip_address 
             FROM crackers c 
-            JOIN reports r ON r.cracker_id=c.id
-            WHERE (c.current_reports >= ?) AND 
-                (c.latest_time - c.first_time >= ?)
+            WHERE (c.current_reports >= ?)
+                AND (c.resiliency >= ?)
                 AND (c.latest_time >= ?)
             ORDER BY c.first_time DESC
             """, min_reports, min_resilience, previous_timestamp)

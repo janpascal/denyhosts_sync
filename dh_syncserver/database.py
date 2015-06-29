@@ -20,7 +20,7 @@ from twisted.internet.defer import inlineCallbacks, returnValue
 
 import config
 
-_schema_version = 1
+_schema_version = 3
 
 def _remove_tables(txn):
     print("Removing all data from database and removing tables")
@@ -43,10 +43,13 @@ def _initdb_sqlite3(txn):
         ip_address CHAR(15), 
         first_time INTEGER, 
         latest_time INTEGER, 
+        resiliency INTEGER,
         total_reports INTEGER, 
         current_reports INTEGER
     )""")
     txn.execute("CREATE UNIQUE INDEX cracker_ip_address ON crackers (ip_address)")
+    txn.execute("CREATE INDEX cracker_qual ON crackers (latest_time, current_reports, resiliency, first_time)")
+    txn.execute("CREATE INDEX cracker_first ON crackers (first_time)")
 
     txn.execute("""CREATE TABLE reports(
         id INTEGER PRIMARY KEY AUTOINCREMENT, 
@@ -84,10 +87,14 @@ def _initdb_MySQLdb(txn):
         ip_address CHAR(15), 
         first_time INTEGER, 
         latest_time INTEGER, 
+        latest_time INTEGER, 
+        resiliency INTEGER,
         total_reports INTEGER, 
         current_reports INTEGER
     )""")
     txn.execute("CREATE UNIQUE INDEX cracker_ip_address ON crackers (ip_address)")
+    txn.execute("CREATE INDEX cracker_qual ON crackers (latest_time, current_reports, resiliency, first_time)")
+    txn.execute("CREATE INDEX cracker_first ON crackers (first_time)")
 
     txn.execute("""CREATE TABLE reports(
         id INTEGER PRIMARY KEY AUTO_INCREMENT, 
@@ -150,6 +157,18 @@ def _evolve_database_sqlite3(txn):
 
         txn.execute('INSERT INTO info VALUES ("last_legacy_sync", 0)')
 
+    if current_version < 2:
+        print("Evolving database to version 2, this may take a while...")
+        txn.execute("ALTER TABLE crackers ADD resiliency INTEGER")
+        txn.execute("CREATE INDEX cracker_qual ON crackers (current_reports, resiliency, latest_time, first_time)")
+        txn.execute("CREATE INDEX cracker_first ON crackers (first_time)")
+        txn.execute("UPDATE crackers SET resiliency=latest_time-first_time")
+
+    if current_version < 3:
+        print("Evolving database to version 3, this may take a while...")
+        txn.execute("DROP INDEX cracker_qual")
+        txn.execute("CREATE INDEX cracker_qual ON crackers (latest_time, current_reports, resiliency, first_time)")
+
     if current_version > _schema_version:
         print("Illegal database schema {}".format(current_version))
 
@@ -179,6 +198,18 @@ def _evolve_database_MySQLdb(txn):
         )""")
         txn.execute('INSERT INTO info VALUES ("schema_version", %s)', (str(_schema_version),))
         txn.execute('INSERT INTO info VALUES ("last_legacy_sync", 0)')
+
+    if current_version < 2:
+        print("Evolving database to version 2, this may take a while...")
+        txn.execute("ALTER TABLE crackers ADD resiliency INTEGER")
+        txn.execute("CREATE INDEX cracker_qual ON crackers (current_reports, resiliency, latest_time, first_time)")
+        txn.execute("CREATE INDEX cracker_first ON crackers (first_time)")
+        txn.execute("UPDATE crackers SET resiliency=latest_time-first_time")
+
+    if current_version < 3:
+        print("Evolving database to version 3, this may take a while...")
+        txn.execute("ALTER TABLE crackers DROP INDEX cracker_qual")
+        txn.execute("CREATE INDEX cracker_qual ON crackers (latest_time, current_reports, resiliency, first_time)")
 
     if current_version > _schema_version:
         print("Illegal database schema {}".format(current_version))

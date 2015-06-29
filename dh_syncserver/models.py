@@ -21,11 +21,8 @@ from twistar.dbobject import DBObject
 class Cracker(DBObject):
     HASMANY=['reports']
 
-    def resiliency(self):
-        return self.latest_time - self.first_time
-
     def __str__(self):
-        return "Cracker({},{},{},{},{},{})".format(self.id,self.ip_address,self.first_time,self.latest_time,self.total_reports,self.current_reports)
+        return "Cracker({},{},{},{},{},{})".format(self.id,self.ip_address,self.first_time,self.latest_time,self.resiliency,self.total_reports,self.current_reports)
 
 class Report(DBObject):
     BELONGSTO=['cracker']

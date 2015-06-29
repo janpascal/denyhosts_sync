@@ -50,7 +50,7 @@ class Server(xmlrpc.XMLRPC):
     @withRequest
     @inlineCallbacks
     def xmlrpc_add_hosts(self, request, hosts):
-        logging.debug("add_hosts({}) from {}".format(hosts, request.getClientIP()))
+        logging.info("add_hosts({}) from {}".format(hosts, request.getClientIP()))
         for cracker_ip in hosts:
             if not self.is_valid_ip_address(cracker_ip):
                 logging.warning("Illegal host ip address {} from {}".format(cracker_ip, request.getClientIP()))
@@ -62,7 +62,8 @@ class Server(xmlrpc.XMLRPC):
             cracker = yield Cracker.find(where=['ip_address=?', cracker_ip], limit=1)
             if cracker is None:
                 now = time.time()
-                cracker = Cracker(ip_address=cracker_ip, first_time=now, latest_time=now, total_reports=0, current_reports=0)
+                cracker = Cracker(ip_address=cracker_ip, first_time=now,
+                    latest_time=now, resiliency=0, total_reports=0, current_reports=0)
                 yield cracker.save()
             yield controllers.add_report_to_cracker(cracker, request.getClientIP())
             
@@ -189,7 +190,7 @@ class Server(xmlrpc.XMLRPC):
         #logging.info("found cracker: {}".format(cracker))
         reports = yield cracker.reports.get()
         #logging.info("found reports: {}".format(reports))
-        cracker_cols=['ip_address','first_time', 'latest_time', 'total_reports', 'current_reports']
+        cracker_cols=['ip_address','first_time', 'latest_time', 'resiliency', 'total_reports', 'current_reports']
         report_cols=['ip_address','first_report_time', 'latest_report_time']
         returnValue( [cracker.toHash(cracker_cols), [r.toHash(report_cols) for r in reports]] )
 
