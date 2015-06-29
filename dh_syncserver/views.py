@@ -16,6 +16,7 @@
 
 import time
 import logging
+import random
 
 from twisted.web import xmlrpc 
 from twisted.web.xmlrpc import withRequest
@@ -131,6 +132,48 @@ class Server(xmlrpc.XMLRPC):
     # For concurrency testing. Remove before public installation!
     def xmlrpc_maintenance(self):
         return controllers.perform_maintenance()
+
+    def random_ip_address(self):
+        while True:
+            ip = ".".join(map(str, (random.randint(0, 255) for _ in range(4))))
+            if self.is_valid_ip_address(ip):
+                return ip
+        
+    _crackers = []
+    @inlineCallbacks
+    def xmlrpc_test_bulk_insert(self, count, same_crackers = False):
+        if same_crackers and len(self._crackers) < count:
+            logging.debug("Filling static crackers from {} to {}".format(len(self._crackers), count))
+            for i in xrange(len(self._crackers), count):
+                self._crackers.append(self.random_ip_address())
+
+        for i in xrange(count):
+            reporter = self.random_ip_address()
+            if same_crackers:
+                cracker_ip = self._crackers[i]
+            else:
+                cracker_ip = self.random_ip_address()
+
+            logging.debug("Adding report for {} from {}".format(cracker_ip, reporter))
+
+            yield utils.wait_and_lock_host(cracker_ip)
+            
+            cracker = yield Cracker.find(where=['ip_address=?', cracker_ip], limit=1)
+            if cracker is None:
+                now = time.time()
+                cracker = Cracker(ip_address=cracker_ip, first_time=now, latest_time=now, total_reports=0, current_reports=0)
+                yield cracker.save()
+            yield controllers.add_report_to_cracker(cracker, reporter)
+            
+            utils.unlock_host(cracker_ip)
+            logging.debug("Done adding report for {} from {}".format(cracker_ip,reporter))
+        total = yield Cracker.count()
+        total_reports = yield Report.count()
+        returnValue((total,total_reports))
+
+    def xmlrpc_clear_bulk_cracker_list(self):
+        self._crackers = []
+        return 0
 
     @inlineCallbacks
     def xmlrpc_get_cracker_info(self, ip):

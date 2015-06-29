@@ -28,14 +28,13 @@ from twisted.internet.defer import inlineCallbacks, returnValue
 
 from twistar.registry import Registry
 
-from dh_syncserver import views
-from dh_syncserver import models
-from dh_syncserver import controllers
-from dh_syncserver.models import Cracker, Report
-from dh_syncserver import config
-from dh_syncserver import initdb
-             
-if __name__ == '__main__':
+import views
+import models
+import controllers
+import config
+import database
+
+def run_main():             
     parser = argparse.ArgumentParser(description="DenyHosts sync server")
     parser.add_argument("-c", "--config", default="/etc/dh_syncserver.conf", help="Configuration file")
     parser.add_argument("--recreate-database", action='store_true', help="Wipe and recreate the database")
@@ -56,11 +55,11 @@ if __name__ == '__main__':
 
     if args.recreate_database:
         single_shot = True
-        initdb.clean_database().addCallback(lambda _:reactor.stop())
+        database.clean_database().addCallback(lambda _:reactor.stop())
 
     if args.evolve_database:
         single_shot = True
-        initdb.evolve_database().addCallback(lambda _:reactor.stop())
+        database.evolve_database().addCallback(lambda _:reactor.stop())
 
     from twisted.internet import reactor
     if not single_shot:

@@ -70,6 +70,16 @@ def read_config(filename):
         dbparams["cp_max"] = 1
         if "database" not in dbparams:
             dbparams["database"] = "/var/lib/dh_syncserver/denyhosts.sqlite"
+    if "cp_max" in dbparams:
+        dbparams["cp_max"] = int(dbparams["cp_max"])
+    if "cp_min" in dbparams:
+        dbparams["cp_min"] = int(dbparams["cp_min"])
+    if "port" in dbparams:
+        dbparams["port"] = int(dbparams["port"])
+    if "connect_timeout" in dbparams:
+        dbparams["connect_timeout"] = float(dbparams["connect_timeout"])
+    if "timeout" in dbparams:
+        dbparams["timeout"] = float(dbparams["timeout"])
 
     maintenance_interval = _getint(_config, "maintenance", "interval_seconds", 3600)
     expiry_days = _getfloat(_config, "maintenance", "expiry_days", 30)

@@ -21,9 +21,8 @@ import xmlrpclib
 from twisted.internet.defer import inlineCallbacks, returnValue
 from twisted.internet.threads  import deferToThread
 
-from twistar.registry import Registry
-
 import config
+import database
 import models
 from models import Cracker, Report, Legacy
 import utils
@@ -64,7 +63,8 @@ def get_qualifying_crackers(min_reports, min_resilience, previous_timestamp,
     # See https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=622697
    
     # This query takes care of conditions (a) and (b)
-    cracker_ids = yield Registry.DBPOOL.runQuery("""
+    # cracker_ids = yield database.runGetPossibleQualifyingCrackerQuery(min_reports, min_resilience, previous_timestamp)
+    cracker_ids = yield database.run_query("""
             SELECT DISTINCT c.id, c.ip_address 
             FROM crackers c 
             JOIN reports r ON r.cracker_id=c.id
@@ -72,8 +72,7 @@ def get_qualifying_crackers(min_reports, min_resilience, previous_timestamp,
                 (c.latest_time - c.first_time >= ?)
                 AND (c.latest_time >= ?)
             ORDER BY c.first_time DESC
-        """, 
-        [min_reports, min_resilience, previous_timestamp])
+            """, min_reports, min_resilience, previous_timestamp)
   
     if cracker_ids is None:
         returnValue([])
@@ -92,8 +91,8 @@ def get_qualifying_crackers(min_reports, min_resilience, previous_timestamp,
         logging.debug(cracker)
         reports = yield cracker.reports.get(orderby="first_report_time ASC")
         logging.debug("reports:")
-        for r in reports:
-            logging.debug("    "+str(r))
+#        for r in reports:
+#            logging.debug("    "+str(r))
         if (len(reports)>=min_reports and 
             reports[min_reports-1].first_report_time >= previous_timestamp): 
             # condition (c) satisfied
@@ -103,7 +102,7 @@ def get_qualifying_crackers(min_reports, min_resilience, previous_timestamp,
             logging.debug("checking (d)...")
             satisfied = False
             for report in reports:
-                logging.debug("    "+str(report))
+                #logging.debug("    "+str(report))
                 if (not satisfied and 
                     report.latest_report_time>=previous_timestamp and
                     report.latest_report_time-cracker.first_time>=min_resilience):
@@ -185,7 +184,8 @@ def download_from_legacy_server():
         logging.debug("No legacy server configured, skipping")
         returnValue(0)
 
-    rows = yield Registry.DBPOOL.runQuery('SELECT `value` FROM info WHERE `key`="last_legacy_sync"')
+    #rows = yield Registry.DBPOOL.runQuery('SELECT `value` FROM info WHERE `key`="last_legacy_sync"')
+    rows = yield database.run_query('SELECT `value` FROM info WHERE `key`="last_legacy_sync"')
     last_legacy_sync_time = int(rows[0][0])
 
     try:
@@ -198,7 +198,8 @@ def download_from_legacy_server():
             last_legacy_sync_time = int(response["timestamp"])
         except:
             logging.ERROR("Illegal timestamp {} from legacy server".format(response["timestamp"]))
-        Registry.DBPOOL.runOperation('UPDATE info SET `value`=? WHERE `key`="last_legacy_sync"', (str(last_legacy_sync_time),))
+        #Registry.DBPOOL.runOperation('UPDATE info SET `value`=%s WHERE `key`="last_legacy_sync"', (str(last_legacy_sync_time),))
+        database.run_operation('UPDATE info SET `value`=? WHERE `key`="last_legacy_sync"', str(last_legacy_sync_time))
         now = time.time()
         logging.debug("Got {} hosts from legacy server".format(len(response["hosts"])))
         for host in response["hosts"]:
