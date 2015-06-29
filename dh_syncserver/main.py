@@ -34,6 +34,10 @@ import controllers
 import config
 import database
 
+def stop_reactor(_):
+    from twisted.internet import reactor
+    reactor.stop()
+
 def run_main():             
     parser = argparse.ArgumentParser(description="DenyHosts sync server")
     parser.add_argument("-c", "--config", default="/etc/dh_syncserver.conf", help="Configuration file")
@@ -55,11 +59,11 @@ def run_main():
 
     if args.recreate_database:
         single_shot = True
-        database.clean_database().addCallback(lambda _:reactor.stop())
+        database.clean_database().addCallbacks(stop_reactor, stop_reactor)
 
     if args.evolve_database:
         single_shot = True
-        database.evolve_database().addCallback(lambda _:reactor.stop())
+        database.evolve_database().addCallbacks(stop_reactor, stop_reactor)
 
     from twisted.internet import reactor
     if not single_shot:
