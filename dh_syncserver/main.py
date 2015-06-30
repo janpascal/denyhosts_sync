@@ -34,7 +34,8 @@ import controllers
 import config
 import database
 
-def stop_reactor(_):
+def stop_reactor(value):
+    print(value)
     from twisted.internet import reactor
     reactor.stop()
 
@@ -67,9 +68,9 @@ def run_main():
 
     from twisted.internet import reactor
 
-    reactor.addSystemEventTrigger("after", "startup", database.check_database_version)
-
     if not single_shot:
+        reactor.addSystemEventTrigger("after", "startup", database.check_database_version)
+
         r = views.Server()
         reactor.listenTCP(config.listen_port, server.Site(r))
 

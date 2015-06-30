@@ -27,6 +27,7 @@ def _remove_tables(txn):
     txn.execute("DROP TABLE IF EXISTS info")
     txn.execute("DROP TABLE IF EXISTS crackers")
     txn.execute("DROP TABLE IF EXISTS reports")
+    txn.execute("DROP TABLE IF EXISTS legacy")
 
 def _evolve_database_v0(txn, dbtype):
     if dbtype=="sqlite3":
@@ -135,7 +136,6 @@ def evolve_database():
 def clean_database():
     yield Registry.DBPOOL.runInteraction(_remove_tables)
     yield Registry.DBPOOL.runInteraction(_evolve_database)
-    returnValue(0)
 
 
 @inlineCallbacks
