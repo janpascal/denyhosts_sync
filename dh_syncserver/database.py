@@ -66,8 +66,8 @@ def _evolve_database_v0(txn, dbtype):
 
 def _evolve_database_v1(txn, dbtype):
     txn.execute("""CREATE TABLE info (
-        `key` TEXT PRIMARY KEY,
-        `value` TEXT
+        `key` CHAR(32) PRIMARY KEY,
+        `value` VARCHAR(255)
     )""")
     if dbtype=="sqlite3":
         txn.execute('INSERT INTO info VALUES ("schema_version", ?)', (str(_schema_version),))
@@ -179,28 +179,3 @@ def run_operation(query, *args):
         print("unsupported database {}".format(config.dbtype))
     return Registry.DBPOOL.runOperation(query, args)
         
-#def runGetPossibleQualifyingCrackerQuery(min_reports, min_resilience, previous_timestamp):
-#    if config.dbtype == "MySQLdb":
-#        return Registry.DBPOOL.runQuery("""
-#            SELECT DISTINCT c.id, c.ip_address 
-#            FROM crackers c 
-#            JOIN reports r ON r.cracker_id=c.id
-#            WHERE (c.current_reports >= %s) AND 
-#                (c.latest_time - c.first_time >= %s)
-#                AND (c.latest_time >= %s)
-#            ORDER BY c.first_time DESC
-#        """, 
-#        [min_reports, min_resilience, previous_timestamp])
-#    elif config.dbtype == "sqlite3":
-#        return Registry.DBPOOL.runQuery("""
-#            SELECT DISTINCT c.id, c.ip_address 
-#            FROM crackers c 
-#            JOIN reports r ON r.cracker_id=c.id
-#            WHERE (c.current_reports >= ?) AND 
-#                (c.latest_time - c.first_time >= ?)
-#                AND (c.latest_time >= ?)
-#            ORDER BY c.first_time DESC
-#        """, 
-#        [min_reports, min_resilience, previous_timestamp])
-#    else:
-#        return Fault("error")
