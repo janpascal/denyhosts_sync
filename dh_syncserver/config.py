@@ -96,7 +96,7 @@ def read_config(filename):
     legacy_threshold = _getint(_config, "sync", "legacy_threshold", 3)
     legacy_resiliency = _getint(_config, "sync", "legacy_resiliency", 18000)
 
-    logfile = _get(_config, "logging", "logfile", "/var/log/dh-syncserver.log")
+    logfile = _get(_config, "logging", "logfile", "/var/log/dh_syncserver/dh_syncserver.log")
     loglevel = _get(_config, "logging", "loglevel", "INFO")
     try:
         loglevel = int(loglevel)
