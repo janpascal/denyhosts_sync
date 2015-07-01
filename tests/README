@@ -1,0 +1,10 @@
+Run these tests from the project root directory using
+ 
+  $ trial tests
+
+Trial is the Twisted test runner. On Debian systems, it is part of the
+python-twisted-core package.
+
+This directory also contains some scripts that are not unit test and cannot be
+run using trial: test.py, fill_database.py and sim_clients.py. The latter two
+scripts are used for performance testing.
