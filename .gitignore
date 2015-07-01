@@ -1,10 +1,9 @@
 *.pyc
-denyhosts.sqlite
+*.sqlite
 .*.swp
 log.txt
-dh_syncserver.log
+*.log
 _trial_temp/
-test.py
 build/
 dist/
 MANIFEST
