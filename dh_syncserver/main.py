@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 # denyhosts sync server
 # Copyright (C) 2015 Jan-Pascal van Best <janpascal@vanbest.org>
 
