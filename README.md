@@ -16,18 +16,18 @@ of `denyhosts`.
 - Fully configurable
 
 ## Prerequisites
-- MySQL database is preferred for large site. For testing purposes sqlite is
+- MySQL database is preferred for large sites. For testing purposes sqlite is
   also supported
-- Python with setuptools
-- The twisted framework and the twistar ORM library are installed automatically
+- Python 2.7 with setuptools
+- The Python twisted framework and the twistar ORM library are installed automatically
   by the setup.py script
-- dh_syncserver is developed and tested on a Debian GNU/Linux system. It should
+- `dh_syncserver` is developed and tested on a Debian GNU/Linux system. It should
   work on any Linux system with Python. Microsoft Windows is not a supported 
   platform, although it should work without major modifications.
 
 ## Installation
 Run the following command: `sudo ./setup.py install`. This will download the
-neede Python libraries, install the Python scripts onto your system (usually in
+needed Python libraries, install the Python scripts onto your system (usually in
 `/usr/local/lib/python2.7/dist-packages`), install the default configuration
 file in `/etc/dh_syncserver.conf` and the Python script
 `/usr/local/bin/dh_syncserver`.
@@ -39,10 +39,10 @@ parameters, the location of the log file (which should be writable by the system
 user that will be running dh_syncserver) and other settings you wish to change.
 
 Prepare the database for first use with the command `dh_syncserver
---recreate-database`. This will create the tabled needed by dh_syncserver.
+--recreate-database`. This will create the tables needed by dh_syncserver.
 
 ## Running dh_syncserver
-Simple run `dh_syncserver`. Unless there are unexpected error, this will give no
+Simply run `dh_syncserver`. Unless there are unexpected error, this will give no
 output and the server will just keep running. 
 
 ## Updates
