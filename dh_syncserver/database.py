@@ -20,7 +20,7 @@ from twisted.internet.defer import inlineCallbacks, returnValue
 
 import config
 
-_schema_version = 3
+_schema_version = 4
 
 def _remove_tables(txn):
     print("Removing all data from database and removing tables")
@@ -88,6 +88,9 @@ def _evolve_database_v3(txn, dbtype):
         txn.execute("ALTER TABLE crackers DROP INDEX cracker_qual")
     txn.execute("CREATE INDEX cracker_qual ON crackers (latest_time, current_reports, resiliency, first_time)")
 
+def _evolve_database_v4(txn, dbtype):
+    txn.execute("CREATE INDEX report_latest ON reports (latest_report_time)")
+
 def _evolve_database(txn):
     print("Evolving database")
     dbtype = config.dbtype
@@ -118,6 +121,10 @@ def _evolve_database(txn):
     if current_version < 3:
         print("Evolving database to version 3, this may take a while...")
         _evolve_database_v3(txn, dbtype)
+
+    if current_version < 4:
+        print("Evolving database to version 4, this may take a while...")
+        _evolve_database_v4(txn, dbtype)
 
     if current_version > _schema_version:
         print("Illegal database schema {}".format(current_version))

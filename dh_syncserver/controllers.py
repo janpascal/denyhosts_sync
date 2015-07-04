@@ -139,33 +139,40 @@ def get_qualifying_crackers(min_reports, min_resilience, previous_timestamp,
 #     be crackers themselves
 #   remove crackers that have no reports left
 
-# TODO How memory intensive is this? Better by direct SQL queries?
+# TODO remove reports by identified crackers
+
 @inlineCallbacks
 def perform_maintenance():
     logging.info("Starting maintenance job...")
 
     now = time.time()
     limit = now - config.expiry_days * 24 * 3600 
-    
-    crackers = yield Cracker.all()
-    if crackers is not None:
-        for cracker in crackers:
-            logging.debug("Maintenance {}".format(cracker.ip_address))
+
+    reports_deleted = 0
+    crackers_deleted = 0
+
+    batch_size = 1000
+  
+    while True:
+        old_reports = yield Report.find(where=["latest_report_time<?", limit], limit=batch_size)
+        if len(old_reports) == 0:
+            break
+        logging.debug("Removing batch of {} old reports".format(len(old_reports)))
+        for report in old_reports:
+            cracker = yield report.cracker.get()
             yield utils.wait_and_lock_host(cracker.ip_address)
-            reports = yield cracker.reports.get()
-            for report in reports:
-                if report.latest_report_time < limit:
-                    logging.info("Maintenance: removing report from {} for cracker {}".format(report.ip_address, cracker.ip_address))
-                    cracker.current_reports -= 1
-                    yield report.cracker.clear()
-                    yield report.delete()
-                    yield cracker.save()
-                # TODO remove reports by identified crackers
+            logging.info("Maintenance: removing report from {} for cracker {}".format(report.ip_address, cracker.ip_address))
+            cracker.current_reports -= 1
+            yield report.cracker.clear()
+            yield report.delete()
+            reports_deleted += 1
+            yield cracker.save()
             if cracker.current_reports == 0:
                 logging.info("Maintenance: removing cracker {}".format(cracker.ip_address))
                 yield cracker.delete()
+                crackers_deleted += 1
             utils.unlock_host(cracker.ip_address)
-            logging.debug("Maintenance {} done".format(cracker.ip_address))
+            logging.debug("Maintenance on report from {} for cracker {} done".format(report.ip_address, cracker.ip_address))
 
     legacy_reports = yield Legacy.find(where=["retrieved_time<?", limit])
     if legacy_reports is not None:
@@ -173,6 +180,7 @@ def perform_maintenance():
             yield legacy.delete()
 
     logging.info("Done maintenance job")
+    logging.info("Expired {} reports and {} hosts".format(reports_deleted, crackers_deleted))
     returnValue(0)
 
 @inlineCallbacks
