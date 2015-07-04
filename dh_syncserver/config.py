@@ -95,8 +95,8 @@ def read_config(filename):
     enable_debug_methods = _getboolean(_config, "sync", "enable_debug_methods", False)
     legacy_server = _get(_config, "sync", "legacy_server", "http://xmlrpc.denyhosts.net:9911")
     legacy_frequency = _getint(_config, "sync", "legacy_frequency", 300)
-    legacy_threshold = _getint(_config, "sync", "legacy_threshold", 3)
-    legacy_resiliency = _getint(_config, "sync", "legacy_resiliency", 18000)
+    legacy_threshold = _getint(_config, "sync", "legacy_threshold", 10)
+    legacy_resiliency = _getint(_config, "sync", "legacy_resiliency", 10800)
 
     logfile = _get(_config, "logging", "logfile", "/var/log/dh_syncserver/dh_syncserver.log")
     loglevel = _get(_config, "logging", "loglevel", "INFO")
