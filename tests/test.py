@@ -23,8 +23,8 @@ print s.add_hosts(["69.192.72.157"])
 #    s.maintenance()
 #    time.sleep(5)
 
-s.test()
-s.maintenance()
+s.debug.test()
+s.debug.maintenance()
 
 #print s.add_hosts(["test4.example.org"])
 

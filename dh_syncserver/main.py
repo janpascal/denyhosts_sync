@@ -27,6 +27,7 @@ from twisted.internet.defer import inlineCallbacks, returnValue
 from twistar.registry import Registry
 
 import views
+import debug_views
 import models
 import controllers
 import config
@@ -70,6 +71,9 @@ def run_main():
         reactor.addSystemEventTrigger("after", "startup", database.check_database_version)
 
         r = views.Server()
+        if config.enable_debug_methods:
+            d = debug_views.DebugServer(r)
+            r.putSubHandler('debug', d)
         reactor.listenTCP(config.listen_port, server.Site(r))
 
         # Set up maintenance job

@@ -39,13 +39,15 @@ class ModelsTest(unittest.TestCase):
         cracker = Cracker(ip_address=cracker_ip, first_time=now, latest_time=now, total_reports=0, current_reports=0)
         cracker = yield cracker.save()
 
-        c2 = yield Cracker.find(where=['ip_address=?', cracker_ip], limit=1)
+        #c2 = yield Cracker.find(where=['ip_address=?', cracker_ip], limit=1)
+        c2 = yield controllers.get_cracker(cracker_ip)
         yield self.assertIsNotNone(c2)
         returnValue(self.assertEqual(c2.ip_address, cracker.ip_address, "Save and re-fetch cracker from database"))
 
     @inlineCallbacks
     def test_add_report(self):
-        c = yield Cracker.find(where=['ip_address=?', "192.168.1.1"], limit=1)
+        #c = yield Cracker.find(where=['ip_address=?', "192.168.1.1"], limit=1)
+        c = yield controllers.get_cracker(ip_address)
         yield self.assertIsNotNone(c)
         yield controllers.add_report_to_cracker(c, "127.0.0.1")
         yield c.save()
