@@ -20,8 +20,6 @@ from twisted.internet.defer import inlineCallbacks, returnValue
 
 import config
 
-_schema_version = 5
-
 def _remove_tables(txn):
     print("Removing all data from database and removing tables")
     txn.execute("DROP TABLE IF EXISTS info")
@@ -29,7 +27,7 @@ def _remove_tables(txn):
     txn.execute("DROP TABLE IF EXISTS reports")
     txn.execute("DROP TABLE IF EXISTS legacy")
 
-def _evolve_database_v0(txn, dbtype):
+def _evolve_database_initial(txn, dbtype):
     if dbtype=="sqlite3":
         autoincrement="AUTOINCREMENT"
     elif dbtype=="MySQLdb":
@@ -98,6 +96,16 @@ def _evolve_database_v5(txn, dbtype):
         txn.execute("ALTER TABLE reports DROP INDEX report_cracker_ip")
     txn.execute("CREATE INDEX report_cracker_ip ON reports (cracker_id, ip_address, latest_report_time)")
 
+_evolutions = {
+    1: _evolve_database_v1,
+    2: _evolve_database_v2,
+    3: _evolve_database_v3,
+    4: _evolve_database_v4,
+    5: _evolve_database_v5
+}
+
+_schema_version = len(_evolutions)
+
 def _evolve_database(txn):
     print("Evolving database")
     dbtype = config.dbtype
@@ -109,41 +117,28 @@ def _evolve_database(txn):
             current_version = int(result[0])
         else:
             print("No schema version in database")
+            _evolve_database_initial(txn, dbtype)
             current_version = 0
     except:
         print("No schema version in database")
+        _evolve_database_initial(txn, dbtype)
         current_version = 0
-
-    print("Current database schema is version {}".format(current_version))
-
-    if current_version < 1:
-        print("Evolving database to version 1")
-        _evolve_database_v0(txn, dbtype)
-        _evolve_database_v1(txn, dbtype)
-
-    if current_version < 2:
-        print("Evolving database to version 2, this may take a while...")
-        _evolve_database_v2(txn, dbtype)
-
-    if current_version < 3:
-        print("Evolving database to version 3, this may take a while...")
-        _evolve_database_v3(txn, dbtype)
-
-    if current_version < 4:
-        print("Evolving database to version 4, this may take a while...")
-        _evolve_database_v4(txn, dbtype)
-
-    if current_version < 5:
-        print("Evolving database to version 5, this may take a while...")
-        _evolve_database_v5(txn, dbtype)
 
     if current_version > _schema_version:
         print("Illegal database schema {}".format(current_version))
+        return
 
-    if dbtype=="sqlite3":
-        txn.execute('UPDATE info SET `value`=? WHERE `key`="schema_version"', (str(_schema_version),))
-    elif dbtype=="MySQLdb":
-        txn.execute('UPDATE info SET `value`=%s WHERE `key`="schema_version"', (str(_schema_version),))
+    print("Current database schema is version {}".format(current_version))
+
+    while current_version < _schema_version:
+        current_version += 1
+        print("Evolving database to version {}...".format(current_version))
+        _evolutions[current_version](txn, dbtype)
+
+        if dbtype=="sqlite3":
+            txn.execute('UPDATE info SET `value`=? WHERE `key`="schema_version"', (str(current_version),))
+        elif dbtype=="MySQLdb":
+            txn.execute('UPDATE info SET `value`=%s WHERE `key`="schema_version"', (str(current_version),))
 
     print("Updated database schema, current version is {}".format(_schema_version))
 
@@ -154,7 +149,6 @@ def evolve_database():
 def clean_database():
     yield Registry.DBPOOL.runInteraction(_remove_tables)
     yield Registry.DBPOOL.runInteraction(_evolve_database)
-
 
 @inlineCallbacks
 def check_database_version():
