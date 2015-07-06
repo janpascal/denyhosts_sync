@@ -31,31 +31,45 @@ def get_cracker(ip_address):
     return Cracker.find(where=["ip_address=?",ip_address], limit=1)
 
 # Note: lock cracker IP first!
+# TODO: merge reports from same client intelligently.
 @inlineCallbacks
 def add_report_to_cracker(cracker, client_ip, when=None):
     if when is None:
         when = time.time()
 
-    report = yield Report.find(
-        where=["cracker_id=? AND ip_address=?", cracker.id, client_ip],
-        limit=1
+    reports = yield Report.find(
+        where=["cracker_id=? AND ip_address=?", cracker.id, client_ip], 
+        orderby='latest_report_time ASC'
     )
-    if report is None:
+    if len(reports) == 0:
         report = Report(ip_address=client_ip, first_report_time=when, latest_report_time=when)
         yield report.save()
         cracker.current_reports += 1
         yield report.cracker.set(cracker)
+    elif len(reports) == 1:
+        report = reports[0]
+        # Add second report after 24 hours
+        if when > report.latest_report_time + 24*3600:
+            report = Report(ip_address=client_ip, first_report_time=when, latest_report_time=when)
+            yield report.save()
+            yield report.cracker.set(cracker)
+    elif len(reports) == 2:
+        latest_report = reports[1]
+        # Add third report after again 24 hours
+        if when > latest_report.latest_report_time + 24*3600:
+            report = Report(ip_address=client_ip, first_report_time=when, latest_report_time=when)
+            yield report.save()
+            yield report.cracker.set(cracker)
     else:
-        report.latest_report_time = when
-        yield report.save()
+        latest_report = reports[-1]
+        latest_report.latest_report_time = when
+        yield latest_report.save()
     
     cracker.total_reports += 1
     cracker.latest_time = when
     cracker.resiliency = when - cracker.first_time
 
     yield cracker.save()
-
-    returnValue(report)
 
 @inlineCallbacks
 def get_qualifying_crackers(min_reports, min_resilience, previous_timestamp,
@@ -142,11 +156,12 @@ def get_qualifying_crackers(min_reports, min_resilience, previous_timestamp,
 # TODO remove reports by identified crackers
 
 @inlineCallbacks
-def perform_maintenance():
+def perform_maintenance(limit = None):
     logging.info("Starting maintenance job...")
-
-    now = time.time()
-    limit = now - config.expiry_days * 24 * 3600 
+    
+    if limit is None:
+        now = time.time()
+        limit = now - config.expiry_days * 24 * 3600 
 
     reports_deleted = 0
     crackers_deleted = 0
@@ -162,7 +177,8 @@ def perform_maintenance():
             cracker = yield report.cracker.get()
             yield utils.wait_and_lock_host(cracker.ip_address)
             logging.info("Maintenance: removing report from {} for cracker {}".format(report.ip_address, cracker.ip_address))
-            cracker.current_reports -= 1
+            current_reports = yield cracker.reports.get(group='ip_address')
+            cracker.current_reports = len(current_reports)
             yield report.cracker.clear()
             yield report.delete()
             reports_deleted += 1
