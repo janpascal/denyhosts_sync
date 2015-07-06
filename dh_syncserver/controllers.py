@@ -31,7 +31,8 @@ def get_cracker(ip_address):
     return Cracker.find(where=["ip_address=?",ip_address], limit=1)
 
 # Note: lock cracker IP first!
-# TODO: merge reports from same client intelligently.
+# Report merging algorithm by Anne Bezemer, see 
+# https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=622697
 @inlineCallbacks
 def add_report_to_cracker(cracker, client_ip, when=None):
     if when is None:

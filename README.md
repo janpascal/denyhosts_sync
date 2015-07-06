@@ -60,6 +60,8 @@ restart dh_syncserver.
 - [Original, seemingly abandoned `DenyHosts` project](http://www.denyhosts.net)
 
 ## Copyright and license
+
+### dh_syncserver
 Copyright (C) 2015 Jan-Pascal van Best <janpascal@vanbest.org>
 
 This program is free software: you can redistribute it and/or modify
@@ -75,3 +77,9 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+### Synchronisation algorithm
+The synchronisation algorithm implemented in dh_syncserver is based
+on an article by Anne Bezemer, published as Debian bug#622697 and
+archived at [Debian bug#622697](https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=622697)
+The article is Copyright (C) 2011 J.A. Bezemer <j.a.bezemer@opensourcepartners.nl>
+and licensed "either GPL >=3 or AGPL >=3, at your option".
