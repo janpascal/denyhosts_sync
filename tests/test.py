@@ -16,12 +16,12 @@ print s.add_hosts(["69.192.72.156"])
 print s.add_hosts(["69.192.72.157"])
 
 # Concurrency testing
-#for i in range(0, 100):
-#    print("Running test {}".format(i))
-#    s.test()
-#    print("Running maintenance")
-#    s.maintenance()
-#    time.sleep(5)
+for i in range(0, 100):
+    print("Running test {}".format(i))
+    s.debug.test()
+    print("Running maintenance")
+    s.debug.maintenance()
+    time.sleep(5)
 
 s.debug.test()
 s.debug.maintenance()
