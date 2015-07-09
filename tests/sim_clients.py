@@ -45,7 +45,7 @@ def run_sim(server, num_threads, count):
         count * num_threads / (end_time - start_time)))
 
 
-run_sim(server, 30, 100)
+run_sim(server, 60, 100)
 
 
 
