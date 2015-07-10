@@ -1,3 +1,5 @@
+import logging
+
 from dh_syncserver import config
 from dh_syncserver import models
 from dh_syncserver import database
@@ -17,4 +19,9 @@ class TestBase(unittest.TestCase):
         config.dbtype = "sqlite3"
         yield database.clean_database()
 
-
+        config.logfile = "unittest.log"
+        config.loglevel = 10
+        logging.basicConfig(filename=config.logfile,
+            level=config.loglevel,
+            format="%(asctime)s %(levelname)-8s %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S")
