@@ -18,6 +18,7 @@ import time
 
 from dh_syncserver import models
 from dh_syncserver import controllers 
+from dh_syncserver import database
 from dh_syncserver.models import Cracker, Report
 
 from twisted.internet.defer import inlineCallbacks, returnValue
@@ -29,17 +30,35 @@ class GetNewHostsTest(base.TestBase):
     @inlineCallbacks
     def test_get_qualifying_crackers(self):
         now = time.time()
-        c = yield Cracker(ip_address="192.168.1.1", first_time=now, latest_time=now, total_reports=0, current_reports=0)
-        c.save()
+        c = yield Cracker(ip_address="192.168.1.1", first_time=now, latest_time=now, total_reports=0, current_reports=0).save()
 
         # First test: cracker without reports should not be reported
         hosts = yield controllers.get_qualifying_crackers(1, 0, now, 50, [])
         self.assertEqual(len(hosts), 0, "Cracker without reports should not be returned")
 
         client_ip = "1.1.1.1"
-        controllers.add_report_to_cracker(c, client_ip, when=now-3600)
+        yield controllers.add_report_to_cracker(c, client_ip, when=now)
         
-        hosts = yield controllers.get_qualifying_crackers(1, -1, now-7200, 50, [])
-        self.assertEqual(len(hosts), 1, "When one report, get_new_hosts with resilience 0 should return one host")
+        hosts = yield controllers.get_qualifying_crackers(1, -1, now-1, 50, [])
+        self.assertEqual(len(hosts), 1, "When one report, get_new_hosts with resilience <0 should return one host")
 
+        hosts = yield controllers.get_qualifying_crackers(2, -1, now-1, 50, [])
+        self.assertEqual(len(hosts), 0, "When one report, get_new_hosts with resilience 0 and threshold 2 should return empty list")
+
+        client_ip = "1.1.1.2"
+        yield controllers.add_report_to_cracker(c, client_ip, when=now+3600)
+
+        hosts = yield controllers.get_qualifying_crackers(2, 3500, now-1, 50, [])
+        self.assertEqual(len(hosts), 1, "Two reports should result in a result")
+
+        hosts = yield controllers.get_qualifying_crackers(2, 3500, now-1, 50, [c.ip_address])
+        self.assertEqual(len(hosts), 0, "Two reports, remove reported host from list")
+
+        hosts = yield controllers.get_qualifying_crackers(3, 3500, now-1, 50, [])
+        self.assertEqual(len(hosts), 0, "Two reports, asked for three")
+
+        hosts = yield controllers.get_qualifying_crackers(2, 4000, now-1, 50, [])
+        self.assertEqual(len(hosts), 0, "Two reports, not enough resiliency")
+
+        
 # vim: tabstop=8 expandtab shiftwidth=4 softtabstop=4
