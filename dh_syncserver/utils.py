@@ -26,10 +26,11 @@ def wait_and_lock_host(host):
     try:
         while host in _hosts_busy:
             logging.debug("waiting to update host {}, {} blocked now".format(host, len(_hosts_busy)))
-            yield task.deferLater(reactor, 0.1, lambda _:0, 0)
+            yield task.deferLater(reactor, 0.01, lambda _:0, 0)
         _hosts_busy.add(host)
     except:
         logging.debug("Exception in locking {}".format(host), exc_info=True)
+
     returnValue(0)
 
 def unlock_host(host):
