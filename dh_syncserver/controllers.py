@@ -202,14 +202,10 @@ def perform_maintenance(limit = None):
 
 @inlineCallbacks
 def download_from_legacy_server():
-    logging.info("Downloading hosts from legacy server...")
-    logging.debug("Sync server: {}".format(config.legacy_server))
-
     if config.legacy_server is None or config.legacy_server == "":
-        logging.debug("No legacy server configured, skipping")
         returnValue(0)
 
-    #rows = yield Registry.DBPOOL.runQuery('SELECT `value` FROM info WHERE `key`="last_legacy_sync"')
+    logging.info("Downloading hosts from legacy server...")
     rows = yield database.run_query('SELECT `value` FROM info WHERE `key`="last_legacy_sync"')
     last_legacy_sync_time = int(rows[0][0])
 
