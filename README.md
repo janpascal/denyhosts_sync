@@ -42,8 +42,12 @@ Prepare the database for first use with the command `dh_syncserver
 --recreate-database`. This will create the tables needed by dh_syncserver.
 
 ## Running dh_syncserver
-Simply run `dh_syncserver`. Unless there are unexpected error, this will give no
+Simply run `dh_syncserver`. Unless there are unexpected errors, this will give no
 output and the server will just keep running. 
+
+## Signals
+When `dh_syncserver` receives the `SIGHUP` signal, it will re-read the
+configuration file. Changes to the database configuration are ignored.
 
 ## Updates
 Installing the new version of `dh_syncserver` with `./setup.py install_scripts

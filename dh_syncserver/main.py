@@ -18,10 +18,11 @@ import sqlite3
 import time
 import logging
 import argparse
+import signal
 
 from twisted.web import server
 from twisted.enterprise import adbapi
-from twisted.internet import task
+from twisted.internet import task, reactor
 from twisted.internet.defer import inlineCallbacks, returnValue
 
 from twistar.registry import Registry
@@ -35,22 +36,87 @@ import database
 
 def stop_reactor(value):
     print(value)
-    from twisted.internet import reactor
     reactor.stop()
+    
+def sighup_handler(signum, frame):
+    global configfile
+    global main_xmlrpc_handler
+
+    logging.info("Received SIGHUP, reloading configuration file...")
+    debug_was_on = config.enable_debug_methods
+    old_listen_port = config.listen_port
+    config.read_config(configfile)
+
+    configure_logging()
+    schedule_jobs()
+
+    if debug_was_on and not config.enable_debug_methods:
+        # Remove debug methods
+        # Missing API in class XMLRPC
+        del main_xmlrpc_handler.subHandlers["debug"]
+
+    if config.enable_debug_methods and not debug_was_on:
+        d = debug_views.DebugServer(main_xmlrpc_handler)
+        main_xmlrpc_handler.putSubHandler('debug', d)
+
+    if config.listen_port != old_listen_port:
+        start_listening(config.listen_port)
+
+    # TODO
+    # Probably exclude database changes.
+
+_listener = None
+def start_listening(port, interface=''):
+    global _listener
+    if _listener is not None:
+        _listener.stopListening()
+    _listener = reactor.listenTCP(port, server.Site(main_xmlrpc_handler), interface=interface)
+
+maintenance_job = None
+legacy_sync_job = None
+
+def schedule_jobs():
+    global maintenance_job, legacy_sync_job
+
+    # Reschedule maintenance job
+    if maintenance_job is not None:
+        maintenance_job.stop()
+    maintenance_job = task.LoopingCall(controllers.perform_maintenance)
+    maintenance_job.start(config.maintenance_interval, now=False) 
+    
+    # Reschedul legacy sync job
+    if legacy_sync_job is not None:
+        legacy_sync_job.stop()
+    legacy_sync_job = task.LoopingCall(controllers.download_from_legacy_server)
+    legacy_sync_job.start(config.legacy_frequency, now=False) 
+
+def configure_logging():
+    # Remove all handlers associated with the root logger object.
+    for handler in logging.root.handlers[:]:
+        logging.root.removeHandler(handler)
+
+    # Use basic configuration
+    logging.basicConfig(filename=config.logfile, 
+        level=config.loglevel,
+        format="%(asctime)s %(levelname)-8s %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S")
 
 def run_main():             
+    global configfile
+    global maintenance_job, legacy_sync_job
+    global main_xmlrpc_handler
+
     parser = argparse.ArgumentParser(description="DenyHosts sync server")
     parser.add_argument("-c", "--config", default="/etc/dh_syncserver.conf", help="Configuration file")
     parser.add_argument("--recreate-database", action='store_true', help="Wipe and recreate the database")
     parser.add_argument("--evolve-database", action='store_true', help="Evolve the database to the latest schema version")
     args = parser.parse_args()
 
+    configfile = args.config
+
     config.read_config(args.config)
 
-    logging.basicConfig(filename=config.logfile, 
-        level=config.loglevel,
-        format="%(asctime)s %(levelname)-8s %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S")
+    configure_logging()
 
     Registry.DBPOOL = adbapi.ConnectionPool(config.dbtype, **config.dbparams)
     Registry.register(models.Cracker, models.Report)
@@ -65,28 +131,21 @@ def run_main():
         single_shot = True
         database.evolve_database().addCallbacks(stop_reactor, stop_reactor)
 
-    from twisted.internet import reactor
-
     if not single_shot:
+        signal.signal(signal.SIGHUP, sighup_handler)
         reactor.addSystemEventTrigger("after", "startup", database.check_database_version)
 
-        r = views.Server()
+        main_xmlrpc_handler = views.Server()
         if config.enable_debug_methods:
-            d = debug_views.DebugServer(r)
-            r.putSubHandler('debug', d)
-        reactor.listenTCP(config.listen_port, server.Site(r))
+            d = debug_views.DebugServer(main_xmlrpc_handler)
+            main_xmlrpc_handler.putSubHandler('debug', d)
+        start_listening(config.listen_port)
 
-        # Set up maintenance job
-        l = task.LoopingCall(controllers.perform_maintenance)
-        l.start(config.maintenance_interval, now=False) 
-        
-        # Set up legacy sync job
-        l = task.LoopingCall(controllers.download_from_legacy_server)
-        l.start(config.legacy_frequency, now=False) 
+        # Set up maintenance and legacy sync jobs
+        schedule_jobs()
     
     # Start reactor
     logging.info("Starting reactor...")
-    logging.getLogger().handlers[0].flush()
     reactor.run()
 
 # vim: tabstop=8 expandtab shiftwidth=4 softtabstop=4
