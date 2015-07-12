@@ -238,4 +238,16 @@ def download_from_legacy_server():
     logging.info("Done downloading hosts from legacy server.")
     returnValue(0)
 
+@inlineCallbacks
+def purge_legacy_addresses():
+    yield database.run_truncate_query('legacy')
+    yield database.run_query('UPDATE info SET `value`=0 WHERE `key`="last_legacy_sync"')
+    returnValue(0)
+
+@inlineCallbacks
+def purge_reported_addresses():
+    yield database.run_truncate_query('crackers')
+    yield database.run_truncate_query('reports')
+    returnValue(0)
+
 # vim: tabstop=8 expandtab shiftwidth=4 softtabstop=4

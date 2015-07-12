@@ -19,6 +19,7 @@ import time
 import logging
 import argparse
 import signal
+import sys
 
 from twisted.web import server
 from twisted.enterprise import adbapi
@@ -37,7 +38,7 @@ import database
 def stop_reactor(value):
     print(value)
     reactor.stop()
-    
+
 def sighup_handler(signum, frame):
     global configfile
     global main_xmlrpc_handler
@@ -82,13 +83,13 @@ def schedule_jobs():
     if maintenance_job is not None:
         maintenance_job.stop()
     maintenance_job = task.LoopingCall(controllers.perform_maintenance)
-    maintenance_job.start(config.maintenance_interval, now=False) 
-    
+    maintenance_job.start(config.maintenance_interval, now=False)
+
     # Reschedul legacy sync job
     if legacy_sync_job is not None:
         legacy_sync_job.stop()
     legacy_sync_job = task.LoopingCall(controllers.download_from_legacy_server)
-    legacy_sync_job.start(config.legacy_frequency, now=False) 
+    legacy_sync_job.start(config.legacy_frequency, now=False)
 
 def configure_logging():
     # Remove all handlers associated with the root logger object.
@@ -96,12 +97,12 @@ def configure_logging():
         logging.root.removeHandler(handler)
 
     # Use basic configuration
-    logging.basicConfig(filename=config.logfile, 
+    logging.basicConfig(filename=config.logfile,
         level=config.loglevel,
         format="%(asctime)s %(levelname)-8s %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S")
 
-def run_main():             
+def run_main():
     global configfile
     global maintenance_job, legacy_sync_job
     global main_xmlrpc_handler
@@ -110,6 +111,12 @@ def run_main():
     parser.add_argument("-c", "--config", default="/etc/dh_syncserver.conf", help="Configuration file")
     parser.add_argument("--recreate-database", action='store_true', help="Wipe and recreate the database")
     parser.add_argument("--evolve-database", action='store_true', help="Evolve the database to the latest schema version")
+    parser.add_argument("--purge-legacy-addresses", action='store_true',
+       help="Purge all hosts downloaded from the legacy server. DO NOT USE WHEN DH_SYNCSERVER IS RUNNING!")
+    parser.add_argument("--purge-reported-addresses", action='store_true',
+        help="Purge all hosts that have been reported by clients. DO NOT USE WHEN DH_SYNCSERVER IS RUNNING!")
+    parser.add_argument("-f", "--force", action='store_true',
+        help="Do not ask for confirmation, execute action immediately")
     args = parser.parse_args()
 
     configfile = args.config
@@ -123,6 +130,16 @@ def run_main():
 
     single_shot = False
 
+    if not args.force and (args.recreate_database
+        or args.evolve_database
+        or args.purge_legacy_addresses
+        or args.purge_reported_addresses
+        or args.recreate_database):
+        print("WARNING: do not run this method when dh_syncserver is running.")
+        reply = raw_input("Are you sure you want to continue (Y/N): ")
+        if not reply.upper().startswith('Y'):
+            sys.exit()
+
     if args.recreate_database:
         single_shot = True
         database.clean_database().addCallbacks(stop_reactor, stop_reactor)
@@ -130,6 +147,14 @@ def run_main():
     if args.evolve_database:
         single_shot = True
         database.evolve_database().addCallbacks(stop_reactor, stop_reactor)
+
+    if args.purge_legacy_addresses:
+        single_shot = True
+        controllers.purge_legacy_addresses().addCallbacks(stop_reactor, stop_reactor)
+
+    if args.purge_reported_addresses:
+        single_shot = True
+        controllers.purge_reported_addresses().addCallbacks(stop_reactor, stop_reactor)
 
     if not single_shot:
         signal.signal(signal.SIGHUP, sighup_handler)
@@ -143,7 +168,7 @@ def run_main():
 
         # Set up maintenance and legacy sync jobs
         schedule_jobs()
-    
+
     # Start reactor
     logging.info("Starting reactor...")
     reactor.run()

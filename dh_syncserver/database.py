@@ -190,4 +190,12 @@ def run_operation(query, *args):
     else:
         print("unsupported database {}".format(config.dbtype))
     return Registry.DBPOOL.runOperation(query, args)
-        
+
+def run_truncate_query(table):
+    if config.dbtype == "MySQLdb":
+        query = "TRUNCATE TABLE `{}`".format(table)
+    elif config.dbtype == "sqlite3":
+        query = "DELETE FROM `{}`".format(table)
+    else:
+        print("unsupported database {}".format(config.dbtype))
+    return Registry.DBPOOL.runQuery(query)
