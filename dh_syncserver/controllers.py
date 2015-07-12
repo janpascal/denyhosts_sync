@@ -250,4 +250,14 @@ def purge_reported_addresses():
     yield database.run_truncate_query('reports')
     returnValue(0)
 
+@inlineCallbacks
+def purge_ip(ip):
+    yield database.run_query("""DELETE FROM reports
+        WHERE cracker_id IN (
+            SELECT id FROM crackers WHERE ip_address=?
+            )""", ip)
+    yield database.run_query("DELETE FROM crackers WHERE ip_address=?", ip)
+    yield database.run_query("DELETE FROM legacy WHERE ip_address=?", ip)
+    returnValue(0)
+
 # vim: tabstop=8 expandtab shiftwidth=4 softtabstop=4

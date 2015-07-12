@@ -77,4 +77,34 @@ class PurgingTest(base.TestBase):
         rows = yield database.run_query('SELECT `value` FROM info WHERE `key`="last_legacy_sync"')
         self.assertEqual(rows[0][0], '0', "Purging legacy should reset last legacy sync time")
         
+    @inlineCallbacks
+    def test_purge_ip(self):
+        now = time.time()
+        c = yield Cracker(ip_address="192.168.211.1", first_time=now, latest_time=now, total_reports=0, current_reports=0).save()
+        c2 = yield Cracker(ip_address="192.168.211.2", first_time=now, latest_time=now, total_reports=0, current_reports=0).save()
+        c3 = yield Cracker(ip_address="192.168.211.3", first_time=now, latest_time=now, total_reports=0, current_reports=0).save()
+
+        yield controllers.add_report_to_cracker(c, "127.0.0.1", when=now)
+        yield controllers.add_report_to_cracker(c, "127.0.0.2", when=now)
+        yield controllers.add_report_to_cracker(c, "127.0.0.9", when=now)
+        yield controllers.add_report_to_cracker(c2, "127.0.0.3", when=now)
+
+        legacy = yield Legacy(ip_address="192.168.211.1", retrieved_time=now).save()
+        legacy = yield Legacy(ip_address="192.168.211.2", retrieved_time=now).save()
+
+        yield controllers.purge_ip("192.168.211.1")
+
+        crackers = yield Cracker.find(orderby='ip_address ASC')
+        self.assertEqual(len(crackers), 2, "Should still have two crackers after purging one")
+        self.assertEquals(crackers[0].ip_address, "192.168.211.2", "Should remove the right cracker")
+        self.assertEquals(crackers[1].ip_address, "192.168.211.3", "Should remove the right cracker")
+
+        reports = yield Report.all()
+        self.assertEqual(len(reports), 1, "Should still have one report left after purging cracker with three reports")
+        self.assertEquals(reports[0].ip_address, "127.0.0.3", "Should remove the right report")
+
+        legacy = yield Legacy.all()
+        self.assertEqual(len(legacy), 1, "Should still have one legacy reports after purging one")
+        self.assertEquals(legacy[0].ip_address, "192.168.211.2", "Should remove the right legacy host")
+
 # vim: tabstop=8 expandtab shiftwidth=4 softtabstop=4

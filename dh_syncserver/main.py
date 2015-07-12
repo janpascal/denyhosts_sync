@@ -115,6 +115,8 @@ def run_main():
        help="Purge all hosts downloaded from the legacy server. DO NOT USE WHEN DH_SYNCSERVER IS RUNNING!")
     parser.add_argument("--purge-reported-addresses", action='store_true',
         help="Purge all hosts that have been reported by clients. DO NOT USE WHEN DH_SYNCSERVER IS RUNNING!")
+    parser.add_argument("--purge-ip", action='store',
+        help="Purge ip address from both legacy and reported host lists. DO NOT USE WHEN DH_SYNCSERVER IS RUNNING!")
     parser.add_argument("-f", "--force", action='store_true',
         help="Do not ask for confirmation, execute action immediately")
     args = parser.parse_args()
@@ -134,7 +136,8 @@ def run_main():
         or args.evolve_database
         or args.purge_legacy_addresses
         or args.purge_reported_addresses
-        or args.recreate_database):
+        or args.recreate_database
+        or args.purge_ip is not None):
         print("WARNING: do not run this method when dh_syncserver is running.")
         reply = raw_input("Are you sure you want to continue (Y/N): ")
         if not reply.upper().startswith('Y'):
@@ -155,6 +158,10 @@ def run_main():
     if args.purge_reported_addresses:
         single_shot = True
         controllers.purge_reported_addresses().addCallbacks(stop_reactor, stop_reactor)
+
+    if args.purge_ip is not None:
+        single_shot = True
+        controllers.purge_ip(args.purge_ip).addCallbacks(stop_reactor, stop_reactor)
 
     if not single_shot:
         signal.signal(signal.SIGHUP, sighup_handler)
