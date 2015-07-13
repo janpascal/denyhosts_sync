@@ -1,7 +1,6 @@
 import time
 
 from dh_syncserver import models
-from dh_syncserver import config 
 from dh_syncserver import controllers 
 from dh_syncserver import views 
 from dh_syncserver.models import Cracker, Report
@@ -31,7 +30,6 @@ class ConcurrencyTest(base.TestBase):
     @inlineCallbacks
     def test_try_and_confuse_server(self):
         self.view = views.Server()
-        config.expiry_days = 5.0 / 24 / 3600
         request = MockRequest("127.0.0.1")
         for i in range(0, 50):
             print("count:{}".format(i))

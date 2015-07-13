@@ -1,7 +1,11 @@
 import logging
+import inspect
+import os
+import os.path
 
 from dh_syncserver import config
 from dh_syncserver import models
+from dh_syncserver import main
 from dh_syncserver import database
 
 from twisted.trial import unittest
@@ -13,15 +17,15 @@ from twistar.registry import Registry
 class TestBase(unittest.TestCase):
     @inlineCallbacks
     def setUp(self):
-        Registry.DBPOOL = adbapi.ConnectionPool("sqlite3", "unittest.sqlite")
-        Registry.register(models.Cracker, models.Report)
-        # Kludge to get evolve_database to work
-        config.dbtype = "sqlite3"
-        yield database.clean_database()
+        configfile = os.path.join(
+            os.path.dirname(inspect.getsourcefile(TestBase)),
+            "test.conf"
+        )
 
-        config.logfile = "unittest.log"
-        config.loglevel = 10
-        logging.basicConfig(filename=config.logfile,
-            level=config.loglevel,
-            format="%(asctime)s %(levelname)-8s %(message)s",
-            datefmt="%Y-%m-%d %H:%M:%S")
+        config.read_config(configfile)
+
+        Registry.DBPOOL = adbapi.ConnectionPool(config.dbtype, **config.dbparams)
+        Registry.register(models.Cracker, models.Report, models.Legacy)
+
+        yield database.clean_database()
+        main.configure_logging()
