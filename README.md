@@ -24,6 +24,12 @@ of `denyhosts`.
 - `dh_syncserver` is developed and tested on a Debian GNU/Linux system. It should
   work on any Linux system with Python. Microsoft Windows is not a supported 
   platform, although it should work without major modifications.
+- On most installations the sqlite3 Python library comes with Python 2.7. If
+  not, you need to install it manually, possibly with using pip:
+  `pip install pysqlite` or, on Debian/Ubuntu, `apt-get install python-pysqlite2`.
+- If you use a MySQL database, you need to install the appropriate Python
+  library. possibly by running `pip install MySQL-python`. On Debian/Ubuntu,
+  use `apt-get install python-mysqldb`.
 
 ## Installation
 Run the following command: `sudo ./setup.py install`. This will download the
