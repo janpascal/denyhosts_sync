@@ -48,7 +48,7 @@ def _getfloat(config, section, option, default=None):
 
 def read_config(filename):
     global dbtype, dbparams
-    global maintenance_interval, expiry_days
+    global maintenance_interval, expiry_days, legacy_expiry_days
     global max_reported_crackers
     global logfile
     global loglevel
@@ -89,6 +89,7 @@ def read_config(filename):
 
     maintenance_interval = _getint(_config, "maintenance", "interval_seconds", 3600)
     expiry_days = _getfloat(_config, "maintenance", "expiry_days", 30)
+    legacy_expiry_days = _getfloat(_config, "maintenance", "legacy_expiry_days", 30)
 
     max_reported_crackers = _getint(_config, "sync", "max_reported_crackers", 50)
     listen_port = _getint(_config, "sync", "listen_port", 9911)

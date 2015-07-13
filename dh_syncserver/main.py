@@ -43,7 +43,7 @@ def sighup_handler(signum, frame):
     global configfile
     global main_xmlrpc_handler
 
-    logging.info("Received SIGHUP, reloading configuration file...")
+    logging.warning("Received SIGHUP, reloading configuration file...")
     debug_was_on = config.enable_debug_methods
     old_listen_port = config.listen_port
     config.read_config(configfile)
@@ -62,9 +62,6 @@ def sighup_handler(signum, frame):
 
     if config.listen_port != old_listen_port:
         start_listening(config.listen_port)
-
-    # TODO
-    # Probably exclude database changes.
 
 _listener = None
 def start_listening(port, interface=''):
@@ -128,7 +125,7 @@ def run_main():
     configure_logging()
 
     Registry.DBPOOL = adbapi.ConnectionPool(config.dbtype, **config.dbparams)
-    Registry.register(models.Cracker, models.Report)
+    Registry.register(models.Cracker, models.Report, models.Legacy)
 
     single_shot = False
 

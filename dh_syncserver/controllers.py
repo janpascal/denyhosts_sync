@@ -157,15 +157,20 @@ def get_qualifying_crackers(min_reports, min_resilience, previous_timestamp,
 # TODO remove reports by identified crackers
 
 @inlineCallbacks
-def perform_maintenance(limit = None):
+def perform_maintenance(limit = None, legacy_limit = None):
     logging.info("Starting maintenance job...")
     
     if limit is None:
         now = time.time()
-        limit = now - config.expiry_days * 24 * 3600 
+        limit = now - config.expiry_days * 24 * 3600
+
+    if legacy_limit is None:
+        now = time.time()
+        legacy_limit = now - config.legacy_expiry_days * 24 * 3600
 
     reports_deleted = 0
     crackers_deleted = 0
+    legacy_deleted = 0
 
     batch_size = 1000
   
@@ -177,27 +182,30 @@ def perform_maintenance(limit = None):
         for report in old_reports:
             cracker = yield report.cracker.get()
             yield utils.wait_and_lock_host(cracker.ip_address)
-            logging.info("Maintenance: removing report from {} for cracker {}".format(report.ip_address, cracker.ip_address))
-            current_reports = yield cracker.reports.get(group='ip_address')
-            cracker.current_reports = len(current_reports)
+            logging.debug("Maintenance: removing report from {} for cracker {}".format(report.ip_address, cracker.ip_address))
             yield report.cracker.clear()
             yield report.delete()
             reports_deleted += 1
+
+            current_reports = yield cracker.reports.get(group='ip_address')
+            cracker.current_reports = len(current_reports)
             yield cracker.save()
+
             if cracker.current_reports == 0:
-                logging.info("Maintenance: removing cracker {}".format(cracker.ip_address))
+                logging.debug("Maintenance: removing cracker {}".format(cracker.ip_address))
                 yield cracker.delete()
                 crackers_deleted += 1
             utils.unlock_host(cracker.ip_address)
             logging.debug("Maintenance on report from {} for cracker {} done".format(report.ip_address, cracker.ip_address))
 
-    legacy_reports = yield Legacy.find(where=["retrieved_time<?", limit])
+    legacy_reports = yield Legacy.find(where=["retrieved_time<?", legacy_limit])
     if legacy_reports is not None:
         for legacy in legacy_reports:
             yield legacy.delete()
+            legacy_deleted += 1
 
     logging.info("Done maintenance job")
-    logging.info("Expired {} reports and {} hosts".format(reports_deleted, crackers_deleted))
+    logging.info("Expired {} reports and {} hosts, plus {} hosts from the legacy list".format(reports_deleted, crackers_deleted, legacy_deleted))
     returnValue(0)
 
 @inlineCallbacks
