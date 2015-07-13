@@ -24,6 +24,7 @@ from dh_syncserver.models import Cracker, Report
 from twisted.internet.defer import inlineCallbacks, returnValue
 
 import base
+import logging
 
 class GetNewHostsTest(base.TestBase):
 
@@ -59,6 +60,20 @@ class GetNewHostsTest(base.TestBase):
 
         hosts = yield controllers.get_qualifying_crackers(2, 4000, now-1, 50, [])
         self.assertEqual(len(hosts), 0, "Two reports, not enough resiliency")
+
+        logging.debug("Testing d2")
+        client_ip = "1.1.1.3"
+        yield controllers.add_report_to_cracker(c, client_ip, when=now+7200)
+
+        hosts = yield controllers.get_qualifying_crackers(2, 3500, now+3601, 50, [])
+        self.assertEqual(len(hosts), 0, "Condition (d2)")
+
+        logging.debug("Testing d1")
+        client_ip = "1.1.1.3"
+        yield controllers.add_report_to_cracker(c, client_ip, when=now+7200+24*3600+1)
+
+        hosts = yield controllers.get_qualifying_crackers(2, 24*3600+1, now+3601, 50, [])
+        self.assertEqual(len(hosts), 1, "Condition (d1)")
 
         
 # vim: tabstop=8 expandtab shiftwidth=4 softtabstop=4

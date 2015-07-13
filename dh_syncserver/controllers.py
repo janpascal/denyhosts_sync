@@ -105,9 +105,10 @@ def get_qualifying_crackers(min_reports, min_resilience, previous_timestamp,
         logging.debug("Examining cracker:")
         logging.debug(cracker)
         reports = yield cracker.reports.get(orderby="first_report_time ASC")
-        logging.debug("reports:")
-#        for r in reports:
-#            logging.debug("    "+str(r))
+        #logging.debug("reports:")
+        #for r in reports:
+        #    logging.debug("    "+str(r))
+        logging.debug("r[m-1].first, prev: {}, {}".format(reports[min_reports-1].first_report_time, previous_timestamp))
         if (len(reports)>=min_reports and 
             reports[min_reports-1].first_report_time >= previous_timestamp): 
             # condition (c) satisfied
