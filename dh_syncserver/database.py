@@ -96,12 +96,22 @@ def _evolve_database_v5(txn, dbtype):
         txn.execute("ALTER TABLE reports DROP INDEX report_cracker_ip")
     txn.execute("CREATE INDEX report_cracker_ip ON reports (cracker_id, ip_address, latest_report_time)")
 
+def _evolve_database_v6(txn, dbtype):
+    # Remove crackers without reports from database. This may have occured
+    # because of a bug in controllers.perform_maintenance()
+    txn.execute("""
+        DELETE FROM crackers 
+        WHERE id NOT IN
+            ( SELECT cracker_id FROM reports )
+        """)
+
 _evolutions = {
     1: _evolve_database_v1,
     2: _evolve_database_v2,
     3: _evolve_database_v3,
     4: _evolve_database_v4,
-    5: _evolve_database_v5
+    5: _evolve_database_v5,
+    6: _evolve_database_v6
 }
 
 _schema_version = len(_evolutions)
