@@ -105,4 +105,18 @@ class ModelsTest(base.TestBase):
         yield c.refresh()
         self.assertEqual(c.current_reports, 1, "Maintenance should still leave one unique reporter")
 
+        # Perform maintenance, expire second report
+        yield controllers.perform_maintenance(limit = now+24*3600+11) 
+        reports = yield Report.find(where=["cracker_id=? and ip_address=?",c.id,"127.0.0.1"])
+        self.assertEqual(len(reports), 1, "Maintenance should remove one more report")
+        yield c.refresh()
+        self.assertEqual(c.current_reports, 1, "Maintenance should still leave one unique reporter")
+
+        # Perform maintenance again, expire last report and cracker
+        yield controllers.perform_maintenance(limit = now+2*24*3600+31) 
+        reports = yield Report.find(where=["cracker_id=? and ip_address=?",c.id,"127.0.0.1"])
+        self.assertEqual(len(reports), 0, "Maintenance should remove last report")
+        cracker = yield controllers.get_cracker("192.168.1.1")
+        self.assertIsNone(cracker, "Maintenance should remove cracker")
+
 # vim: tabstop=8 expandtab shiftwidth=4 softtabstop=4
