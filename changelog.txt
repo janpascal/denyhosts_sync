@@ -1,0 +1,47 @@
+Release 1.0 (2015-07-15)
+- Unit tests added
+- Fix and/or document dependencies on ipaddr and other Python libraries
+- Add database evolution to repair bug in database maintenance, which could leave crackers without reports
+- Add separate legacy_expiry_days config setting
+- Added --purge-legacy-addresses, --purge-reported-addresses and --purge-ip command line options
+- Change default setting not to use legacy sync server
+- Sending SIGHUP now causes dh_syncserver to re-read the configuration file
+- Updated and clarified licensing of Anne Bezemer's algorithm
+
+Release 0.9 (2015-07-06)
+- Improve report merging algorithm
+- Use better default for parameters for sync with legacy server
+
+Release 0.4 (2015-07-04)
+- Make maintenance job quicker and less memory intensive
+- Make debug xmlrpc functions a configuration option
+
+Release 0.3 (2015-07-02)
+- Added README.md
+- Improved setup script
+- Fix creating initial database
+- Fix default log file and add cp_max to default config file
+- Add database schema version check at daemon startup
+- Exit dh_syncserver from --recreate and --evolve-database in case of error
+- Check for supported database type in config file
+- Database optimisation
+- Clean up default config file
+- Support MySQLdb database
+- Added --recreate-database and --evolve-database command line options
+- Make log level configurable
+- Fix concurrency issues
+- Define defaults for config file options
+- Add automatic periodical legacy sync job, to fetch hosts from legacy sync server
+- Stability fixes
+- Rename config file to dh_syncserver.conf and install in /etc/
+- Added setup.py script; move main.py to dh_syncserver script
+- Moved code to dh_syncserver namespace to make room for tests
+- Use hosts_added parameter of get_new_hosts to filter out hosts just sent by client
+- Make tcp port to listen on configurable
+- Max number number of crackers reported to denyhosts configurable (default 50)
+- Implemented maintenance job
+- Check IP addresses for local addresses, RFC1918, multicast, loopback, etc
+- Refuse timestamps from future; return Fault reply on illegal input
+- Check xmlrpc parameters for validity
+- Added copyright info
+- Mostly implemented synchronisation algorithm from Debian #622697
