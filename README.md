@@ -63,6 +63,19 @@ overwrite your configuration file.
 Stop dh_syncserver, update the database tables by running `dh_syncserver --evolve-database` and
 restart dh_syncserver.
 
+## Maintenance
+Old reports will be automatically purged by the configurable maintenance job.
+See the configuration file for configuration options. To clean all reports by
+clients, use the `--purge-reported-addresses` command line option. To clean all
+reports retrieved from the legacy sync server, use the
+`--purge-legacy-addresses` command line option. To purge a specific IP address
+from both the reported and the legacy host lists, use the `--purge-ip` command
+line option.
+
+Note: Use these options with care. Do not use them while `dh_syncserver` is
+running, since this may cause database inconsistencies. Use the `--force`
+command line options to skip the safety prompt when using the purge options.
+
 ## Links
 - [`dh_syncserver` project site](https://github.com/janpascal/denyhosts_sync)
 - [`denyhosts` project site](https://github.com/denyhosts/denyhosts)
