@@ -35,6 +35,8 @@ import controllers
 import config
 import database
 
+import __init__
+
 def stop_reactor(value):
     print(value)
     reactor.stop()
@@ -174,7 +176,7 @@ def run_main():
         schedule_jobs()
 
     # Start reactor
-    logging.info("Starting reactor...")
+    logging.info("Starting dh_syncserver version {}".format(__init__.version))
     reactor.run()
 
 # vim: tabstop=8 expandtab shiftwidth=4 softtabstop=4
