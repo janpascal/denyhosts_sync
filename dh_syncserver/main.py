@@ -84,7 +84,7 @@ def schedule_jobs():
     maintenance_job = task.LoopingCall(controllers.perform_maintenance)
     maintenance_job.start(config.maintenance_interval, now=False)
 
-    # Reschedul legacy sync job
+    # Reschedule legacy sync job
     if legacy_sync_job is not None:
         legacy_sync_job.stop()
     legacy_sync_job = task.LoopingCall(controllers.download_from_legacy_server)
