@@ -65,16 +65,19 @@ class DebugServer(xmlrpc.XMLRPC):
     def random_ip_address(self):
         while True:
             ip = ".".join(map(str, (random.randint(0, 255) for _ in range(4))))
-            if self.is_valid_ip_address(ip):
+            if self.server.is_valid_ip_address(ip):
                 return ip
         
     _crackers = []
     @inlineCallbacks
-    def xmlrpc_test_bulk_insert(self, count, same_crackers = False):
+    def xmlrpc_test_bulk_insert(self, count, same_crackers = False, when=None):
         if same_crackers and len(self._crackers) < count:
             logging.debug("Filling static crackers from {} to {}".format(len(self._crackers), count))
             for i in xrange(len(self._crackers), count):
                 self._crackers.append(self.random_ip_address())
+
+        if when is None:
+            when = time.time()
 
         for i in xrange(count):
             reporter = self.random_ip_address()
@@ -89,10 +92,9 @@ class DebugServer(xmlrpc.XMLRPC):
             
             cracker = yield Cracker.find(where=['ip_address=?', cracker_ip], limit=1)
             if cracker is None:
-                now = time.time()
-                cracker = Cracker(ip_address=cracker_ip, first_time=now, latest_time=now, total_reports=0, current_reports=0)
+                cracker = Cracker(ip_address=cracker_ip, first_time=when, latest_time=when, total_reports=0, current_reports=0)
                 yield cracker.save()
-            yield controllers.add_report_to_cracker(cracker, reporter)
+            yield controllers.add_report_to_cracker(cracker, reporter, when=when)
             
             utils.unlock_host(cracker_ip)
             logging.debug("Done adding report for {} from {}".format(cracker_ip,reporter))

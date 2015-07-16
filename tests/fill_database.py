@@ -2,6 +2,7 @@
 import xmlrpclib
 import time
 import threading
+import random
 
 server = 'http://localhost:9911/xmlrpc/'
 
@@ -9,7 +10,7 @@ def run(server, count, known_crackers):
     #print("Connecting to server {}".format(server))
     s = xmlrpclib.ServerProxy(server)
     start_time = time.time()
-    s.test_bulk_insert(count, known_crackers)
+    s.debug.test_bulk_insert(count, known_crackers, start_time - random.random()*24*3600)
     #print("Inserting {} hosts took {} seconds".format(count, time.time() - start_time))
 
 def run_insert_test(server, num_threads, count, known_crackers):
@@ -35,9 +36,10 @@ def run_insert_test(server, num_threads, count, known_crackers):
 
 s = xmlrpclib.ServerProxy(server)
 for num_threads in xrange(20, 59):
-    print("Inserting {} hosts {} times, please wait...".format(1000, num_threads))
-    s.clear_bulk_cracker_list()
-    run_insert_test(server, num_threads, 1000, True)
+    print("Inserting {} hosts {} times, please wait...".format(100, num_threads))
+    s.debug.clear_bulk_cracker_list()
+    run_insert_test(server, num_threads, 100, True)
+    time.sleep(3)
 
     print("==============================================")
 
