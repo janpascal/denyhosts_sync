@@ -32,6 +32,7 @@ from jinja2 import Template, Environment, PackageLoader
 import GeoIP
 
 import pygal
+from pygal.style import CleanStyle
 
 from dh_syncserver import config
 from dh_syncserver import models
@@ -53,10 +54,10 @@ def fixup_crackers(hosts):
         except Exception, e:
             print("Exception looking up country for {}: {}".format(host.ip_address, e))
             host.country = ''
-        #host.num_reports = yield host.reports.count()
         try:
-            hostinfo = socket.gethostbyaddr(host.ip_address)
-            host.hostname = hostinfo[0]
+            #hostinfo = socket.gethostbyaddr(host.ip_address)
+            #host.hostname = hostinfo[0]
+            host.hostname = 'disabled'
         except Exception, e:
             print("Exception looking up reverse DNS for {}: {}".format(host.ip_address, e))
             host.hostname = host.ip_address
@@ -78,30 +79,9 @@ def create_stats():
             stats["num_clients"] = 0
 
         yesterday = now - 24*3600
-#        try:
-#            rows_yesterday = yield database.run_query("""
-#                SELECT num_hosts,num_reports, num_clients, new_hosts 
-#                FROM stats 
-#                WHERE time<? 
-#                ORDER BY time DESC 
-#                LIMIT 1""", yesterday)
-#            stats["daily_reports"] = rows[0][1] - rows_yesterday[0][1] 
-#        except:
-#            stats["daily_reports"] = rows[0][1]
-#
         stats["daily_reports"] = yield models.Report.count(where=["first_report_time>?", yesterday])
         stats["daily_new_hosts"] = yield models.Cracker.count(where=["first_time>?", yesterday])
 
-#        try:
-#            rows_totals = yield database.run_query("""
-#                SELECT count(*) 
-#                FROM crackers 
-#                WHERE first_time>=? 
-#                """, yesterday)
-#            stats["daily_new_hosts"] = rows_totals[0][0]
-#        except:
-#            stats["daily_new_hosts"] = 0
-#
         recent_hosts = yield models.Cracker.find(orderby="latest_time DESC", limit=10)
         fixup_crackers(recent_hosts)
         stats["recent_hosts"] = recent_hosts
@@ -110,20 +90,13 @@ def create_stats():
         fixup_crackers(most_reported_hosts)
         stats["most_reported_hosts"] = most_reported_hosts
 
-        
-        print("Now is {}".format(now))
-        yesterday = datetime.datetime.fromtimestamp(now)
-        print("Now is {}".format(yesterday))
-        print("Unix timestamp is {}".format(yesterday.strftime("%s")))
-        yesterday = yesterday.replace(minute=0, second=0, microsecond=0)
-        start_hour = yesterday.hour
-        print("Start of hour is {}".format(yesterday))
-        yesterday = int(yesterday.strftime('%s'))
-        print("Unix timestamp is {}".format(yesterday))
-        yesterday = yesterday - 24*3600
-        print("Unix timestamp yesterday is {}".format(yesterday))
-        print("From yesdatday to today is {} seconds".format(now - yesterday))
-        print("is {} hours".format((now - yesterday) / 3600))
+        # Calculate start of daily period: yesterday on the beginning of the
+        # current hour
+        dt_now = datetime.datetime.fromtimestamp(now)
+        start_hour = dt_now.hour
+        dt_onthehour = dt_now.replace(minute=0, second=0, microsecond=0)
+        dt_start = dt_onthehour - datetime.timedelta(days=1)
+        yesterday = int(dt_start.strftime('%s'))
 
         rows = yield database.run_query("""
             SELECT CAST((first_report_time-?)/3600 AS UNSIGNED INTEGER), count(*)
@@ -132,12 +105,38 @@ def create_stats():
             GROUP BY CAST((first_report_time-?)/3600 AS UNSIGNED INTEGER)
             """, yesterday, yesterday, yesterday)
         print(rows)
-        hourly_chart = pygal.Line(show_legend = False)
+        hourly_chart = pygal.Line(show_legend = False, style=CleanStyle)
         hourly_chart.title = 'Number of reports per hour (until {})'.format( datetime.datetime.fromtimestamp(now).strftime("%d-%m-%Y %H:%M:%S"))
         hourly_chart.x_labels = [ str((start_hour + row[0]) % 24) for row in rows ]
         hourly_chart.add('# of reports', [ row[1] for row in rows ])
+
         hourly_chart.render_to_file(filename='hourly.svg') 
         hourly_chart.render_to_png(filename='hourly.png') 
+
+        # Calculate start of monthly period: last month on the beginning of the
+        # current day
+        dt_now = datetime.datetime.fromtimestamp(now)
+        start_hour = dt_now.hour
+        start_day =  dt_now.day
+        dt_ontheday = dt_now.replace(hour=0, minute=0, second=0, microsecond=0)
+        dt_start = dt_onthehour - datetime.timedelta(weeks=4)
+        yestermonth = int(dt_start.strftime('%s'))
+
+        rows = yield database.run_query("""
+            SELECT CAST((first_report_time-?)/24/3600 AS UNSIGNED INTEGER), count(*)
+            FROM reports
+            WHERE first_report_time > ?
+            GROUP BY CAST((first_report_time-?)/24/3600 AS UNSIGNED INTEGER)
+            """, yestermonth, yestermonth, yestermonth)
+        print(rows)
+        daily_chart = pygal.Line(show_legend = False, style=CleanStyle)
+        daily_chart.title = 'Number of reports per day (until {})'.format( datetime.datetime.fromtimestamp(now).strftime("%d-%m-%Y %H:%M:%S"))
+        daily_chart.x_labels = [ str((dt_start +
+        datetime.timedelta(days=row[0])).day) for row in rows ]
+        daily_chart.add('# of reports', [ row[1] for row in rows ])
+        
+        daily_chart.render_to_file(filename='monthly.svg') 
+        daily_chart.render_to_png(filename='monthly.png') 
 
         env = Environment(loader=PackageLoader('dh_syncserver', 'templates'))
         env.filters['datetime'] = format_datetime

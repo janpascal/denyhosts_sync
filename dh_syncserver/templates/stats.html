@@ -51,9 +51,30 @@
                     </table>
               </div>
               <div class="col-md-6">
-                <figure>
-                      <embed type="image/svg+xml" src="hourly.svg" />
-                </figure>
+                    <ul id="myTabs" class="nav nav-tabs" role="tablist">
+                        <li class="" role="presentation">
+                            <a id="hourly-tab" aria-expanded="false" aria-controls="hourly" data-toggle="tab" role="tab" href="#hourly">
+                                Last day
+                            </a>
+                        </li>
+                        <li class="active" role="presentation">
+                            <a id="monthly-tab" aria-controls="monthly" data-toggle="tab" role="tab" href="#monthly" aria-expanded="true">
+                                Last 28 days
+                            </a>
+                        </li>
+                    </ul>
+                    <div id="myTabContent" class="tab-content">
+                        <div id="hourly" class="tab-pane fade" aria-labelledby="hourly-tab" role="tabpanel">
+                            <figure>
+                                  <embed type="image/svg+xml" src="hourly.svg" />
+                            </figure>
+                        </div>
+                        <div id="monthly" class="tab-pane fade active in" aria-labelledby="monthly-tab" role="tabpanel">
+                            <figure>
+                                  <embed type="image/svg+xml" src="monthly.svg" />
+                            </figure>
+                        </div>
+                    </div>
               </div>
             </div>
           </div>
