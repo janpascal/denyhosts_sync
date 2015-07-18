@@ -34,6 +34,7 @@ import models
 import controllers
 import config
 import database
+import stats
 
 import __init__
 
@@ -74,9 +75,10 @@ def start_listening(port, interface=''):
 
 maintenance_job = None
 legacy_sync_job = None
+stats_job = None
 
 def schedule_jobs():
-    global maintenance_job, legacy_sync_job
+    global maintenance_job, legacy_sync_job, stats_job
 
     # Reschedule maintenance job
     if maintenance_job is not None:
@@ -89,6 +91,12 @@ def schedule_jobs():
         legacy_sync_job.stop()
     legacy_sync_job = task.LoopingCall(controllers.download_from_legacy_server)
     legacy_sync_job.start(config.legacy_frequency, now=False)
+
+    # Reschedule legacy sync job
+    if stats_job is not None:
+        stats_job.stop()
+    stats_job = task.LoopingCall(stats.create_stats_page)
+    stats_job.start(config.stats_frequency, now=False)
 
 def configure_logging():
     # Remove all handlers associated with the root logger object.

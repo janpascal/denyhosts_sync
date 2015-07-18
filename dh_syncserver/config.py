@@ -57,6 +57,7 @@ def read_config(filename):
     global legacy_frequency
     global legacy_threshold, legacy_resiliency
     global enable_debug_methods
+    global stats_frequency
 
     _config = ConfigParser.SafeConfigParser()
     _config.read(filename)
@@ -76,6 +77,9 @@ def read_config(filename):
         dbparams["cp_max"] = 1
         if "database" not in dbparams:
             dbparams["database"] = "/var/lib/dh_syncserver/denyhosts.sqlite"
+    elif dbtype=="MySQLdb":
+        dbparams["cp_reconnect"] = True
+
     if "cp_max" in dbparams:
         dbparams["cp_max"] = int(dbparams["cp_max"])
     if "cp_min" in dbparams:
@@ -109,3 +113,5 @@ def read_config(filename):
         except KeyError:
             print("Illegal log level {}".format(loglevel))
             loglevel = logging.INFO
+
+    stats_frequency = _getint(_config, "stats", "update_frequency", 600)
