@@ -18,7 +18,8 @@ import time
 import logging
 import random
 
-from twisted.web import xmlrpc 
+from twisted.web import server, xmlrpc, error
+from twisted.web.resource import Resource
 from twisted.web.xmlrpc import withRequest
 from twisted.internet.defer import inlineCallbacks, returnValue
 from twisted.internet import reactor
@@ -29,6 +30,7 @@ from models import Cracker, Report
 import config
 import controllers
 import utils
+import stats
 
 class Server(xmlrpc.XMLRPC):
     """
@@ -109,5 +111,29 @@ class Server(xmlrpc.XMLRPC):
                 config.max_reported_crackers, set(hosts_added))
         logging.debug("returning: {}".format(result))
         returnValue( result)
+
+class WebResource(Resource):
+    #isLeaf = True
+
+    #def getChild(self, name, request):
+    #    logging.debug("getChild({},{})".format(name,request))
+    #    if name == '':
+    #        return self
+    #    return Resource.getChild(self, name, request)
+
+    def render_GET(self, request):
+        logging.debug("GET({})".format(request))
+        request.setHeader("Content-Type", "text/html; charset=utf-8")
+        def done(result):
+            request.write(result.encode('utf-8'))
+            request.finish()
+        def fail(err):
+            #request.setResponseCode(501)
+            #request.write("Server error")
+            #request.write(str(err))
+            #request.finish()
+            request.processingFailed(err)
+        stats.render_stats().addCallbacks(done, fail)
+        return server.NOT_DONE_YET
 
 # vim: tabstop=8 expandtab shiftwidth=4 softtabstop=4

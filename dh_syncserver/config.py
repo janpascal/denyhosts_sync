@@ -15,7 +15,9 @@
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import ConfigParser
+import inspect
 import logging
+import os.path
 import sys
 
 def _get(config, section, option, default=None):
@@ -58,6 +60,7 @@ def read_config(filename):
     global legacy_threshold, legacy_resiliency
     global enable_debug_methods
     global stats_frequency
+    global static_dir, graph_dir
 
     _config = ConfigParser.SafeConfigParser()
     _config.read(filename)
@@ -115,3 +118,10 @@ def read_config(filename):
             loglevel = logging.INFO
 
     stats_frequency = _getint(_config, "stats", "update_frequency", 600)
+    static_dir = _get(_config, "stats", "static_dir", 
+        os.path.join( 
+            os.path.dirname(
+                os.path.dirname(inspect.getsourcefile(read_config))
+            ),
+            "static"))
+    graph_dir = _get(_config, "stats", "graph_dir", os.path.join(static_dir, "graph"))

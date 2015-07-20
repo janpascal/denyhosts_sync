@@ -14,14 +14,12 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import sqlite3
-import time
-import logging
 import argparse
+import logging
 import signal
 import sys
 
-from twisted.web import server
+from twisted.web import server, resource, static
 from twisted.enterprise import adbapi
 from twisted.internet import task, reactor
 from twisted.internet.defer import inlineCallbacks, returnValue
@@ -41,6 +39,11 @@ import __init__
 def stop_reactor(value):
     print(value)
     reactor.stop()
+
+web_root = None
+main_xmlrpc_handler = None
+stats_resource = None
+web_static = None
 
 def sighup_handler(signum, frame):
     global configfile
@@ -69,9 +72,11 @@ def sighup_handler(signum, frame):
 _listener = None
 def start_listening(port, interface=''):
     global _listener
+    global main_xmlrpc_handler, web_root
+
     if _listener is not None:
         _listener.stopListening()
-    _listener = reactor.listenTCP(port, server.Site(main_xmlrpc_handler), interface=interface)
+    _listener = reactor.listenTCP(port, server.Site(web_root), interface=interface)
 
 maintenance_job = None
 legacy_sync_job = None
@@ -95,7 +100,7 @@ def schedule_jobs():
     # Reschedule legacy sync job
     if stats_job is not None:
         stats_job.stop()
-    stats_job = task.LoopingCall(stats.create_stats_page)
+    stats_job = task.LoopingCall(stats.update_stats_cache)
     stats_job.start(config.stats_frequency, now=False)
 
 def configure_logging():
@@ -112,7 +117,7 @@ def configure_logging():
 def run_main():
     global configfile
     global maintenance_job, legacy_sync_job
-    global main_xmlrpc_handler
+    global main_xmlrpc_handler, stats_resource, web_root, web_static
 
     parser = argparse.ArgumentParser(description="DenyHosts sync server")
     parser.add_argument("-c", "--config", default="/etc/dh_syncserver.conf", help="Configuration file")
@@ -174,7 +179,15 @@ def run_main():
         signal.signal(signal.SIGHUP, sighup_handler)
         reactor.addSystemEventTrigger("after", "startup", database.check_database_version)
 
+        web_root = resource.Resource()
         main_xmlrpc_handler = views.Server()
+        stats_resource = views.WebResource()
+        web_static = static.File(config.static_dir)
+        web_graphs = static.File(config.graph_dir)
+        web_root.putChild('xmlrpc', main_xmlrpc_handler)
+        web_root.putChild('stats', stats_resource)
+        web_root.putChild('static', web_static)
+        web_static.putChild('graphs', web_graphs)
         if config.enable_debug_methods:
             d = debug_views.DebugServer(main_xmlrpc_handler)
             main_xmlrpc_handler.putSubHandler('debug', d)

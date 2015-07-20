@@ -17,8 +17,10 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
+import config
 import datetime
 import socket
+import os.path
 import time
 import logging
 
@@ -60,12 +62,25 @@ def fixup_crackers(hosts):
             logging.debug("Exception looking up reverse DNS for {}: {}".format(host.ip_address, e))
             host.hostname = host.ip_address
 
+_cache = None
+_stats_busy = False
+
 @inlineCallbacks
-def create_stats_page(stop_reactor = False):
-    logging.info("Updating static statistics page...")
+def update_stats_cache():
+    global _stats_busy
+    global _cache
+    if _stats_busy:
+        logging.debug("Already updating statistics cache, exiting")
+        returnValue(None)
+    _stats_busy = True
+
+    logging.info("Updating statistics cache...")
     now = time.time()
     stats = {}
     stats["last_updated"] = now
+    # Note paths configured in main by the Resource objects
+    stats["static_base"] = "../static"
+    stats["graph_base"] = "../static/graphs"
     try:
         #rows = yield database.run_query("SELECT num_hosts,num_reports, num_clients, new_hosts FROM stats ORDER BY time DESC LIMIT 1")
         stats["num_hosts"] = yield models.Cracker.count()
@@ -110,8 +125,8 @@ def create_stats_page(stop_reactor = False):
         hourly_chart.x_labels = [ str((start_hour + row[0]) % 24) for row in rows ]
         hourly_chart.add('# of reports', [ row[1] for row in rows ])
 
-        hourly_chart.render_to_file(filename='hourly.svg') 
-        hourly_chart.render_to_png(filename='hourly.png') 
+        hourly_chart.render_to_file(filename=os.path.join(config.graph_dir, 'hourly.svg'))
+        #hourly_chart.render_to_png(filename='static/graphs/hourly.png') 
 
         # Calculate start of monthly period: last month on the beginning of the
         # current day
@@ -135,21 +150,36 @@ def create_stats_page(stop_reactor = False):
         datetime.timedelta(days=row[0])).day) for row in rows ]
         daily_chart.add('# of reports', [ row[1] for row in rows ])
 
-        daily_chart.render_to_file(filename='monthly.svg') 
-        daily_chart.render_to_png(filename='monthly.png') 
+        daily_chart.render_to_file(filename=os.path.join(config.graph_dir, 'monthly.svg'))
+        #daily_chart.render_to_png(filename='static/graphs/monthly.png') 
 
+        if _cache is None:
+            _cache = {}
+        _cache["stats"] = stats
+        _cache["time"] = time.time()
+    except Exception, e:
+        logging.warning("Error updating statistics: {}".format(e))
+
+    _stats_busy = False
+
+@inlineCallbacks
+def render_stats():
+    global _cache
+    logging.info("Rendering statistics page...")
+    if _cache is None:
+        logging.debug("No statistics cached yet, doing that now...")
+        yield update_stats_cache()
+
+    now = time.time()
+    try:
         env = Environment(loader=PackageLoader('dh_syncserver', 'templates'))
         env.filters['datetime'] = format_datetime
         template = env.get_template('stats.html')
-        html = template.render(stats)
+        html = template.render(_cache["stats"])
 
-        with open('stats.html', 'w') as f:
-            f.write(html)
+        logging.info("Done rendering statistics page...")
+        returnValue(html)
     except Exception, e:
         logging.warning("Error creating statistics page: {}".format(e))
-
-    if stop_reactor:
-        reactor.stop()
-    logging.info("Done updating static statistics page...")
 
 # vim: tabstop=8 expandtab shiftwidth=4 softtabstop=4

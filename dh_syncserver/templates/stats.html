@@ -8,7 +8,7 @@
     <title>DenyHosts</title>
 
     <!-- Bootstrap -->
-    <link href="css/bootstrap.min.css" rel="stylesheet">
+    <link href="{{ static_base }}/css/bootstrap.min.css" rel="stylesheet">
 
     <!-- HTML5 shim and Respond.js for IE8 support of HTML5 elements and media queries -->
     <!-- WARNING: Respond.js doesn't work if you view the page via file:// -->
@@ -23,7 +23,7 @@
     <!-- jQuery (necessary for Bootstrap's JavaScript plugins) -->
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js"></script>
     <!-- Include all compiled plugins (below), or include individual files as needed -->
-    <script src="js/bootstrap.min.js"></script>
+    <script src="{{ static_base }}/js/bootstrap.min.js"></script>
     <div class="panel panel-primary">
       <div class="panel-heading">
         <h3 class="panel-title">Summary</h3>
@@ -66,12 +66,12 @@
                     <div id="myTabContent" class="tab-content">
                         <div id="hourly" class="tab-pane fade" aria-labelledby="hourly-tab" role="tabpanel">
                             <figure>
-                                  <embed type="image/svg+xml" src="hourly.svg" />
+                                  <embed type="image/svg+xml" src="{{ graph_base }}/hourly.svg" />
                             </figure>
                         </div>
                         <div id="monthly" class="tab-pane fade active in" aria-labelledby="monthly-tab" role="tabpanel">
                             <figure>
-                                  <embed type="image/svg+xml" src="monthly.svg" />
+                                  <embed type="image/svg+xml" src="{{ graph_base }}/monthly.svg" />
                             </figure>
                         </div>
                     </div>
