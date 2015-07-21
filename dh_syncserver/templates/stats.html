@@ -48,30 +48,42 @@
                     <tr>
                     <td>New hosts in last 24 hours</td><td>{{ daily_new_hosts }}</td>
                     </tr>
+                    <td>Synchronisation server version</td><td>{{ server_version }}</td>
+                    </tr>
                     </table>
               </div>
               <div class="col-md-6">
                     <ul id="myTabs" class="nav nav-tabs" role="tablist">
-                        <li class="" role="presentation">
+                        <li class="active" role="presentation">
                             <a id="hourly-tab" aria-expanded="false" aria-controls="hourly" data-toggle="tab" role="tab" href="#hourly">
                                 Last day
                             </a>
                         </li>
-                        <li class="active" role="presentation">
+                        <li role="presentation">
                             <a id="monthly-tab" aria-controls="monthly" data-toggle="tab" role="tab" href="#monthly" aria-expanded="true">
                                 Last 28 days
                             </a>
                         </li>
+                        <li role="presentation">
+                            <a id="contrib-tab" aria-controls="contrib" data-toggle="tab" role="tab" href="#contrib" aria-expanded="true">
+                                Contributors
+                            </a>
+                        </li>
                     </ul>
                     <div id="myTabContent" class="tab-content">
-                        <div id="hourly" class="tab-pane fade" aria-labelledby="hourly-tab" role="tabpanel">
+                        <div id="hourly" class="tab-pane fade in active" aria-labelledby="hourly-tab" role="tabpanel">
                             <figure>
                                   <embed type="image/svg+xml" src="{{ graph_base }}/hourly.svg" />
                             </figure>
                         </div>
-                        <div id="monthly" class="tab-pane fade active in" aria-labelledby="monthly-tab" role="tabpanel">
+                        <div id="monthly" class="tab-pane fade" aria-labelledby="monthly-tab" role="tabpanel">
                             <figure>
                                   <embed type="image/svg+xml" src="{{ graph_base }}/monthly.svg" />
+                            </figure>
+                        </div>
+                        <div id="contrib" class="tab-pane fade" aria-labelledby="contrib-tab" role="tabpanel">
+                            <figure>
+                                  <embed type="image/svg+xml" src="{{ graph_base }}/contrib.svg" />
                             </figure>
                         </div>
                     </div>

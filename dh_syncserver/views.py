@@ -125,7 +125,10 @@ class WebResource(Resource):
         logging.debug("GET({})".format(request))
         request.setHeader("Content-Type", "text/html; charset=utf-8")
         def done(result):
-            request.write(result.encode('utf-8'))
+            if result is None:
+                request.write("<h1>An error has occurred</h1>")
+            else:
+                request.write(result.encode('utf-8'))
             request.finish()
         def fail(err):
             #request.setResponseCode(501)

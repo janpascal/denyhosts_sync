@@ -23,6 +23,7 @@ import socket
 import os.path
 import time
 import logging
+import __init__
 
 from twisted.internet import reactor, threads
 from twisted.internet.defer import inlineCallbacks, returnValue
@@ -78,9 +79,10 @@ def update_stats_cache():
     now = time.time()
     stats = {}
     stats["last_updated"] = now
-    # Note paths configured in main by the Resource objects
+    # Note paths configured in main.py by the Resource objects
     stats["static_base"] = "../static"
     stats["graph_base"] = "../static/graphs"
+    stats["server_version"] = __init__.version
     try:
         #rows = yield database.run_query("SELECT num_hosts,num_reports, num_clients, new_hosts FROM stats ORDER BY time DESC LIMIT 1")
         stats["num_hosts"] = yield models.Cracker.count()
@@ -120,13 +122,11 @@ def update_stats_cache():
             WHERE first_report_time > ?
             GROUP BY CAST((first_report_time-?)/3600 AS UNSIGNED INTEGER)
             """, yesterday, yesterday, yesterday)
-        hourly_chart = pygal.Line(show_legend = False, style=CleanStyle)
+        hourly_chart = pygal.Line(show_legend = False, style=CleanStyle, human_readable = True)
         hourly_chart.title = 'Number of reports per hour (until {})'.format( datetime.datetime.fromtimestamp(now).strftime("%d-%m-%Y %H:%M:%S"))
         hourly_chart.x_labels = [ str((start_hour + row[0]) % 24) for row in rows ]
         hourly_chart.add('# of reports', [ row[1] for row in rows ])
-
         hourly_chart.render_to_file(filename=os.path.join(config.graph_dir, 'hourly.svg'))
-        #hourly_chart.render_to_png(filename='static/graphs/hourly.png') 
 
         # Calculate start of monthly period: last month on the beginning of the
         # current day
@@ -144,14 +144,42 @@ def update_stats_cache():
             WHERE first_report_time > ?
             GROUP BY CAST((first_report_time-?)/24/3600 AS UNSIGNED INTEGER)
             """, yestermonth, yestermonth, yestermonth)
-        daily_chart = pygal.Line(show_legend = False, style=CleanStyle)
+        daily_chart = pygal.Line(show_legend = False, style=CleanStyle, human_readable = True)
         daily_chart.title = 'Number of reports per day (until {})'.format( datetime.datetime.fromtimestamp(now).strftime("%d-%m-%Y %H:%M:%S"))
-        daily_chart.x_labels = [ str((dt_start +
-        datetime.timedelta(days=row[0])).day) for row in rows ]
+        daily_chart.x_labels = [ str((dt_start + datetime.timedelta(days=row[0])).day) for row in rows ]
         daily_chart.add('# of reports', [ row[1] for row in rows ])
-
         daily_chart.render_to_file(filename=os.path.join(config.graph_dir, 'monthly.svg'))
-        #daily_chart.render_to_png(filename='static/graphs/monthly.png') 
+
+        # Number of reporters over days
+        logging.debug("Creating graph for contributors")
+        first_time  = yield database.run_query("""
+            SELECT MIN(first_report_time) FROM reports
+            """)
+        dt_first = datetime.datetime.fromtimestamp(first_time[0][0])
+        dt_firstday = dt_first.replace(hour=0, minute=0, second=0, microsecond=0)
+        firstday = int(dt_firstday.strftime("%s"))
+        logging.debug("first day: {}".format(dt_firstday))
+        rows = yield database.run_query(""" 
+            SELECT CAST((start_time-?)/24/3600 AS UNSIGNED INTEGER) AS day, COUNT(*) AS count
+            FROM (
+                SELECT MIN(first_report_time) AS start_time 
+                FROM reports 
+                GROUP BY ip_address
+                ) AS series 
+           GROUP BY day 
+           ORDER BY day ASC
+            """, firstday)
+        accumulated_reporters = reduce(lambda l,x: l + ((x[0],l[-1][1]+x[1]),), rows[1:], rows[:1])
+        #logging.debug("Reporters: {}".format(accumulated_reporters))
+        reporters_chart = pygal.DateLine(show_legend = False, style=CleanStyle,
+            human_readable = True,
+            x_label_rotation=20)
+        reporters_chart.title = 'Number of contributors'
+        reporters_chart.x_label_format = "%Y-%m-%d"
+        #reporters_chart.x_labels = [ str((dt_firstday+ datetime.timedelta(days=row[0])).day) for row in accumulated_reporters]
+        reporters_chart.add('# of contributors', [ 
+            (dt_firstday + datetime.timedelta(days=row[0]), row[1]) for row in accumulated_reporters])
+        reporters_chart.render_to_file(filename=os.path.join(config.graph_dir, 'contrib.svg'))
 
         if _cache is None:
             _cache = {}
