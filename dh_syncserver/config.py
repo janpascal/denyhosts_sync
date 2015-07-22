@@ -63,7 +63,7 @@ def read_config(filename):
     global static_dir, graph_dir, template_dir
 
     _config = ConfigParser.SafeConfigParser()
-    _config.read(filename)
+    _config.readfp(open(filename,'r'))
 
     dbtype = _get(_config, "database", "type", "sqlite3")
     if dbtype not in ["sqlite3","MySQLdb"]:
