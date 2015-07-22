@@ -13,7 +13,7 @@ setup(name='dh_syncserver',
       author_email='janpascal@vanbest.org',
       url='http://www.github.com/janpascal/denyhosts_sync_server',
       packages=['dh_syncserver'],
-      install_requires=["Twisted", "twistar", "ipaddr"],
+      install_requires=["Twisted", "twistar", "ipaddr", "jinja2", "pygal", "GeoIP"],
       scripts=['scripts/dh_syncserver'],
       data_files=[
         (etcpath, glob("dh_syncserver.conf")),
