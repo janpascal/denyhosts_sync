@@ -16,6 +16,11 @@ setup(name='dh_syncserver',
       install_requires=["Twisted", "twistar", "ipaddr", "jinja2", "pygal", "GeoIP"],
       scripts=['scripts/dh_syncserver'],
       data_files=[
+        ('static/js', glob('static/js/*.js')),
+        ('static/css', glob('static/css/*.css')),
+        ('static/graph', glob('static/graph/README')),
+        ('template', glob('template/*')),
+        ('docs', glob('docs/*')),
       ],
       license="""
 Copyright (C) 2015 Jan-Pascal van Best <janpascal@vanbest.org>
