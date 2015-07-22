@@ -16,7 +16,6 @@ setup(name='dh_syncserver',
       install_requires=["Twisted", "twistar", "ipaddr", "jinja2", "pygal", "GeoIP"],
       scripts=['scripts/dh_syncserver'],
       data_files=[
-        (etcpath, glob("dh_syncserver.conf")),
       ],
       license="""
 Copyright (C) 2015 Jan-Pascal van Best <janpascal@vanbest.org>
