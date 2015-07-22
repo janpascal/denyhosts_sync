@@ -98,5 +98,10 @@
 #static_dir: static
 
 # Location of graph files. The server will cache the generated statistic
-# graph images here. Default: static/graph
+# graph images here. This directory should be writable by the server.
+# Default: static/graph
 #graph_dir: static/graph
+
+# Location of template files.
+# Default: template
+#template_dir: template

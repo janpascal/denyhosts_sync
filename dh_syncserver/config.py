@@ -60,7 +60,7 @@ def read_config(filename):
     global legacy_threshold, legacy_resiliency
     global enable_debug_methods
     global stats_frequency
-    global static_dir, graph_dir
+    global static_dir, graph_dir, template_dir
 
     _config = ConfigParser.SafeConfigParser()
     _config.read(filename)
@@ -118,10 +118,10 @@ def read_config(filename):
             loglevel = logging.INFO
 
     stats_frequency = _getint(_config, "stats", "update_frequency", 600)
+    package_dir =  os.path.dirname(os.path.dirname(inspect.getsourcefile(read_config)))
     static_dir = _get(_config, "stats", "static_dir", 
         os.path.join( 
-            os.path.dirname(
-                os.path.dirname(inspect.getsourcefile(read_config))
-            ),
+            package_dir,
             "static"))
     graph_dir = _get(_config, "stats", "graph_dir", os.path.join(static_dir, "graph"))
+    template_dir = _get(_config, "stats", "template_dir", os.path.join(package_dir, "template"))

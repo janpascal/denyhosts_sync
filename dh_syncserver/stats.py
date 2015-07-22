@@ -27,7 +27,7 @@ import logging
 from twisted.internet import reactor, threads
 from twisted.internet.defer import inlineCallbacks, returnValue
 
-from jinja2 import Template, Environment, PackageLoader
+from jinja2 import Template, Environment, FileSystemLoader
 
 import GeoIP
 
@@ -200,7 +200,7 @@ def render_stats():
 
     now = time.time()
     try:
-        env = Environment(loader=PackageLoader('dh_syncserver', 'templates'))
+        env = Environment(loader=FileSystemLoader(config.template_dir))
         env.filters['datetime'] = format_datetime
         template = env.get_template('stats.html')
         html = template.render(_cache["stats"])
