@@ -14,6 +14,7 @@ of `denyhosts`.
 - Supports bootstrapping from legacy server
 - Synchronisation algorithm that has safeguards against database poisoning
 - Fully configurable
+- Dynamically generated statistics web page
 
 ## Prerequisites
 - MySQL database is preferred for large sites. For testing purposes sqlite is
@@ -22,7 +23,7 @@ of `denyhosts`.
 - The Python twisted framework and the twistar ORM library are installed automatically
   by the setup.py script
 - `dh_syncserver` is developed and tested on a Debian GNU/Linux system. It should
-  work on any Linux system with Python. Microsoft Windows is not a supported 
+  work on any Linux system with Python. Microsoft Windows is not a supported
   platform, although it should work without major modifications.
 - On most installations the sqlite3 Python library comes with Python 2.7. If
   not, you need to install it manually, possibly with using pip:
@@ -39,26 +40,36 @@ file in `/etc/dh_syncserver.conf` and the Python script
 `/usr/local/bin/dh_syncserver`.
 
 ## Configuration
-Create the database and a database user with full rights to it.  Edit the 
-configuration file in `/etc/dh_syncserver.conf`. Fill in the database
-parameters, the location of the log file (which should be writable by the system
-user that will be running dh_syncserver) and other settings you wish to change.
+Create the database and a database user with full rights to it. Copy the
+`dh_syncserver.conf.example` from the `docs` directory to
+`/etc/dh_syncserver.conf` and edit it.
+Fill in the database parameters, the location of the log file (which should be
+writable by the system user that will be running dh_syncserver) and
+other settings you wish to change. `graph_dir` in the `stats` sections is
+another location that should be writable by `dh_syncserver`.
 
 Prepare the database for first use with the command `dh_syncserver
 --recreate-database`. This will create the tables needed by dh_syncserver.
 
 ## Running dh_syncserver
 Simply run `dh_syncserver`. Unless there are unexpected errors, this will give no
-output and the server will just keep running. 
+output and the server will just keep running. Configure your DenyHosts clients
+to use the new synchronisation server by setting
+```
+SYNC_SERVER=http://your.host.name:9911
+```
+Once the server is running, you can watch the statistics page at
+`http://your.host.name:9911/stats`
 
 ## Signals
 When `dh_syncserver` receives the `SIGHUP` signal, it will re-read the
 configuration file. Changes to the database configuration are ignored.
 
 ## Updates
-Installing the new version of `dh_syncserver` with `./setup.py install_scripts
-install_lib`. Do not install the data parts of the package because it may
-overwrite your configuration file.
+Installing the new version of `dh_syncserver` with `./setup.py install`.
+Edit the configuration file at `/etc/dh_syncserver.conf` to configure any new
+feature added since the last release. Check `changelog.txt` for new
+configuration items.
 
 Stop dh_syncserver, update the database tables by running `dh_syncserver --evolve-database` and
 restart dh_syncserver.
