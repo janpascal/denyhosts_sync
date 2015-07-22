@@ -7,7 +7,7 @@ import random
 def random_ip_address():
     return ".".join(map(str, (random.randint(0, 255) for _ in range(4))))
 
-server = 'http://localhost:9911/xmlrpc/'
+server = 'http://localhost:9911'
 
 def run(server, count):
     # Assuming every client will supply 1 new host every 8minutes

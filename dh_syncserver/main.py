@@ -23,6 +23,7 @@ from twisted.web import server, resource, static
 from twisted.enterprise import adbapi
 from twisted.internet import task, reactor
 from twisted.internet.defer import inlineCallbacks, returnValue
+from twisted.python import log
 
 from twistar.registry import Registry
 
@@ -113,6 +114,10 @@ def configure_logging():
         level=config.loglevel,
         format="%(asctime)s %(levelname)-8s %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S")
+
+    # Collect Twisted log messages in Python logging system
+    observer = log.PythonLoggingObserver()
+    observer.start()
 
 def run_main():
     global configfile

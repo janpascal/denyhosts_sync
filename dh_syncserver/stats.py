@@ -23,7 +23,6 @@ import socket
 import os.path
 import time
 import logging
-import __init__
 
 from twisted.internet import reactor, threads
 from twisted.internet.defer import inlineCallbacks, returnValue
@@ -37,6 +36,7 @@ from pygal.style import CleanStyle
 
 import models
 import database
+import __init__
 
 def format_datetime(value, format='medium'):
     dt = datetime.datetime.fromtimestamp(value)

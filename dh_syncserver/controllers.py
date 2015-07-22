@@ -183,20 +183,22 @@ def perform_maintenance(limit = None, legacy_limit = None):
         for report in old_reports:
             cracker = yield report.cracker.get()
             yield utils.wait_and_lock_host(cracker.ip_address)
-            logging.debug("Maintenance: removing report from {} for cracker {}".format(report.ip_address, cracker.ip_address))
-            yield report.cracker.clear()
-            yield report.delete()
-            reports_deleted += 1
+            try:
+                logging.debug("Maintenance: removing report from {} for cracker {}".format(report.ip_address, cracker.ip_address))
+                yield report.cracker.clear()
+                yield report.delete()
+                reports_deleted += 1
 
-            current_reports = yield cracker.reports.get(group='ip_address')
-            cracker.current_reports = len(current_reports)
-            yield cracker.save()
+                current_reports = yield cracker.reports.get(group='ip_address')
+                cracker.current_reports = len(current_reports)
+                yield cracker.save()
 
-            if cracker.current_reports == 0:
-                logging.debug("Maintenance: removing cracker {}".format(cracker.ip_address))
-                yield cracker.delete()
-                crackers_deleted += 1
-            utils.unlock_host(cracker.ip_address)
+                if cracker.current_reports == 0:
+                    logging.debug("Maintenance: removing cracker {}".format(cracker.ip_address))
+                    yield cracker.delete()
+                    crackers_deleted += 1
+            finally:
+                utils.unlock_host(cracker.ip_address)
             logging.debug("Maintenance on report from {} for cracker {} done".format(report.ip_address, cracker.ip_address))
 
     legacy_reports = yield Legacy.find(where=["retrieved_time<?", legacy_limit])

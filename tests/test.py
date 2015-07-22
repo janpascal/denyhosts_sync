@@ -3,7 +3,7 @@ import xmlrpclib
 import time
 
 
-server = 'http://localhost:9911/xmlrpc/'
+server = 'http://localhost:9911'
 print("Connecting to server {}".format(server))
 s = xmlrpclib.ServerProxy(server)
 

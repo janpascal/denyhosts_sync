@@ -4,13 +4,13 @@ import time
 import threading
 import random
 
-server = 'http://localhost:9911/xmlrpc/'
+server = 'http://localhost:9911'
 
 def run(server, count, known_crackers):
     #print("Connecting to server {}".format(server))
     s = xmlrpclib.ServerProxy(server)
     start_time = time.time()
-    s.debug.test_bulk_insert(count, known_crackers, start_time - random.random()*24*3600)
+    s.debug.test_bulk_insert(count, known_crackers, start_time - random.random()*7*24*3600)
     #print("Inserting {} hosts took {} seconds".format(count, time.time() - start_time))
 
 def run_insert_test(server, num_threads, count, known_crackers):

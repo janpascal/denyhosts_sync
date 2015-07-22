@@ -23,6 +23,7 @@ from twisted.web.resource import Resource
 from twisted.web.xmlrpc import withRequest
 from twisted.internet.defer import inlineCallbacks, returnValue
 from twisted.internet import reactor
+from twisted.python import log
 import ipaddr
 
 import models
@@ -52,64 +53,75 @@ class Server(xmlrpc.XMLRPC):
     @withRequest
     @inlineCallbacks
     def xmlrpc_add_hosts(self, request, hosts):
-        logging.info("add_hosts({}) from {}".format(hosts, request.getClientIP()))
-        for cracker_ip in hosts:
-            if not self.is_valid_ip_address(cracker_ip):
-                logging.warning("Illegal host ip address {} from {}".format(cracker_ip, request.getClientIP()))
-                raise xmlrpc.Fault(101, "Illegal IP address \"{}\".".format(cracker_ip))
+        try:
+            logging.info("add_hosts({}) from {}".format(hosts, request.getClientIP()))
+            for cracker_ip in hosts:
+                if not self.is_valid_ip_address(cracker_ip):
+                    logging.warning("Illegal host ip address {} from {}".format(cracker_ip, request.getClientIP()))
+                    raise xmlrpc.Fault(101, "Illegal IP address \"{}\".".format(cracker_ip))
 
-            logging.debug("Adding report for {} from {}".format(cracker_ip, request.getClientIP()))
-            yield utils.wait_and_lock_host(cracker_ip)
-            
-            cracker = yield Cracker.find(where=['ip_address=?', cracker_ip], limit=1)
-            if cracker is None:
-                now = time.time()
-                cracker = Cracker(ip_address=cracker_ip, first_time=now,
-                    latest_time=now, resiliency=0, total_reports=0, current_reports=0)
-                yield cracker.save()
-            yield controllers.add_report_to_cracker(cracker, request.getClientIP())
-            
-            utils.unlock_host(cracker_ip)
-            logging.debug("Done adding report for {} from {}".format(cracker_ip,request.getClientIP()))
+                logging.debug("Adding report for {} from {}".format(cracker_ip, request.getClientIP()))
+                yield utils.wait_and_lock_host(cracker_ip)
+                try:
+                    cracker = yield Cracker.find(where=['ip_address=?', cracker_ip], limit=1)
+                    if cracker is None:
+                        now = time.time()
+                        cracker = Cracker(ip_address=cracker_ip, first_time=now,
+                            latest_time=now, resiliency=0, total_reports=0, current_reports=0)
+                        yield cracker.save()
+                    yield controllers.add_report_to_cracker(cracker, request.getClientIP())
+                finally:
+                    utils.unlock_host(cracker_ip)
+                logging.debug("Done adding report for {} from {}".format(cracker_ip,request.getClientIP()))
+        except xmlrpc.Fault, e:
+            raise e
+        except Exception, e:
+            log.err(_why="Exception in add_hosts")
+            raise xmlrpc.Fault(104, "Error adding hosts: {}".format(str(e)))
 
         returnValue(0)
 
     @withRequest
     @inlineCallbacks
     def xmlrpc_get_new_hosts(self, request, timestamp, threshold, hosts_added, resiliency):
-        logging.debug("get_new_hosts({},{},{},{}) from {}".format(timestamp, threshold, 
-            hosts_added, resiliency, request.getClientIP()))
         try:
-            timestamp = long(timestamp)
-            threshold = int(threshold)
-            resiliency = long(resiliency)
-        except:
-            logging.warning("Illegal arguments to get_new_hosts from client {}".format(request.getClientIP()))
-            raise xmlrpc.Fault(102, "Illegal parameters.")
+            logging.debug("get_new_hosts({},{},{},{}) from {}".format(timestamp, threshold, 
+                hosts_added, resiliency, request.getClientIP()))
+            try:
+                timestamp = long(timestamp)
+                threshold = int(threshold)
+                resiliency = long(resiliency)
+            except:
+                logging.warning("Illegal arguments to get_new_hosts from client {}".format(request.getClientIP()))
+                raise xmlrpc.Fault(102, "Illegal parameters.")
 
-        now = time.time()
-        # refuse timestamps from the future
-        if timestamp > now:
-            logging.warning("Illegal timestamp to get_new_hosts from client {}".format(request.getClientIP()))
-            raise xmlrpc.Fault(103, "Illegal timestamp.")
+            now = time.time()
+            # refuse timestamps from the future
+            if timestamp > now:
+                logging.warning("Illegal timestamp to get_new_hosts from client {}".format(request.getClientIP()))
+                raise xmlrpc.Fault(103, "Illegal timestamp.")
 
-        for host in hosts_added:
-            if not self.is_valid_ip_address(host):
-                logging.warning("Illegal host ip address {}".format(host))
-                raise xmlrpc.Fault(101, "Illegal IP address \"{}\".".format(host))
+            for host in hosts_added:
+                if not self.is_valid_ip_address(host):
+                    logging.warning("Illegal host ip address {}".format(host))
+                    raise xmlrpc.Fault(101, "Illegal IP address \"{}\".".format(host))
 
+            # TODO: maybe refuse timestamp from far past because it will 
+            # cause much work? OTOH, denyhosts will use timestamp=0 for 
+            # the first run!
+            # TODO: check if client IP is a known cracker
 
-        # TODO: maybe refuse timestamp from far past because it will 
-        # cause much work? OTOH, denyhosts will use timestamp=0 for 
-        # the first run!
-        # TODO: check if client IP is a known cracker
-
-        result = {}
-        result['timestamp'] = str(long(time.time()))
-        result['hosts'] = yield controllers.get_qualifying_crackers(
-                threshold, resiliency, timestamp, 
-                config.max_reported_crackers, set(hosts_added))
-        logging.debug("returning: {}".format(result))
+            result = {}
+            result['timestamp'] = str(long(time.time()))
+            result['hosts'] = yield controllers.get_qualifying_crackers(
+                    threshold, resiliency, timestamp, 
+                    config.max_reported_crackers, set(hosts_added))
+            logging.debug("returning: {}".format(result))
+        except xmlrpc.Fault, e:
+            raise e
+        except Exception, e:
+            log.err(_why="Exception in xmlrpc_get_new_hosts")
+            raise xmlrpc.Fault(105, "Error in get_new_hosts: {}".format(str(e)))
         returnValue( result)
 
 class WebResource(Resource):
