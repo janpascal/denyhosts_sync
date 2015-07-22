@@ -184,7 +184,7 @@ def run_main():
         stats_resource = views.WebResource()
         web_static = static.File(config.static_dir)
         web_graphs = static.File(config.graph_dir)
-        web_root.putChild('xmlrpc', main_xmlrpc_handler)
+        web_root.putChild('RPC2', main_xmlrpc_handler)
         web_root.putChild('stats', stats_resource)
         web_root.putChild('static', web_static)
         web_static.putChild('graphs', web_graphs)
