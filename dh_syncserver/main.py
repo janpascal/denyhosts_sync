@@ -190,14 +190,19 @@ def run_main():
         signal.signal(signal.SIGHUP, sighup_handler)
         reactor.addSystemEventTrigger("after", "startup", database.check_database_version)
 
+        # Configure web resources
         web_root = resource.Resource()
         main_xmlrpc_handler = views.Server()
         stats_resource = views.WebResource()
         web_static = static.File(config.static_dir)
         web_graphs = static.File(config.graph_dir)
+        # /RPC2
         web_root.putChild('RPC2', main_xmlrpc_handler)
+        # /stats
         web_root.putChild('stats', stats_resource)
+        # /static
         web_root.putChild('static', web_static)
+        # /static/graphs
         web_static.putChild('graphs', web_graphs)
         if config.enable_debug_methods:
             d = debug_views.DebugServer(main_xmlrpc_handler)
