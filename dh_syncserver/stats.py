@@ -88,7 +88,7 @@ def update_stats_cache():
         stats["num_hosts"] = yield models.Cracker.count()
         stats["num_reports"] = yield models.Report.count()
 
-        rows = yield database.run_query("SELECT count(*) FROM reports GROUP BY ip_address") 
+        rows = yield database.run_query("SELECT count(DISTINCT ip_address) FROM reports") 
         if len(rows)>0:
             stats["num_clients"] = rows[0][0]
         else:
