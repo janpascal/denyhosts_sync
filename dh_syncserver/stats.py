@@ -106,6 +106,9 @@ def update_stats_cache():
         yield threads.deferToThread(fixup_crackers, most_reported_hosts)
         stats["most_reported_hosts"] = most_reported_hosts
 
+        logging.info("Stats: {} reports for {} hosts from {} reporters".format(
+            stats["num_reports"], stats["num_hosts"], stats["num_clients"]))
+
         # Calculate start of daily period: yesterday on the beginning of the
         # current hour
         dt_now = datetime.datetime.fromtimestamp(now)
@@ -151,14 +154,12 @@ def update_stats_cache():
         daily_chart.render_to_file(filename=os.path.join(config.graph_dir, 'monthly.svg'))
 
         # Number of reporters over days
-        logging.debug("Creating graph for contributors")
         first_time  = yield database.run_query("""
             SELECT MIN(first_report_time) FROM reports
             """)
         dt_first = datetime.datetime.fromtimestamp(first_time[0][0])
         dt_firstday = dt_first.replace(hour=0, minute=0, second=0, microsecond=0)
         firstday = int(dt_firstday.strftime("%s"))
-        logging.debug("first day: {}".format(dt_firstday))
         rows = yield database.run_query(""" 
             SELECT CAST((start_time-?)/24/3600 AS UNSIGNED INTEGER) AS day, COUNT(*) AS count
             FROM (
