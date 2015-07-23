@@ -6,11 +6,9 @@ log.txt
 _trial_temp/
 build/
 dist/
+*.egg-info/
 MANIFEST
 .coverage
 htmlcov
-hourly.png
-hourly.svg
-monthly.png
-monthly.svg
-stats.html
+static/graph/*.svg
+static/graph/*.png
