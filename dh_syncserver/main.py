@@ -18,6 +18,7 @@ import argparse
 import logging
 import signal
 import sys
+import ConfigParser
 
 from twisted.web import server, resource, static
 from twisted.enterprise import adbapi
@@ -140,7 +141,12 @@ def run_main():
 
     configfile = args.config
 
-    config.read_config(args.config)
+    try:
+        config.read_config(args.config)
+    except ConfigParser.NoSectionError, e:
+        print("Error in reading the configuration file from \"{}\": {}.".format(args.config, e))
+        print("Please review the configuration file. Look at the supplied dh_syncserver.conf.example for more information.")
+        sys.exit()
 
     configure_logging()
 
