@@ -60,6 +60,7 @@ def read_config(filename):
     global legacy_threshold, legacy_resiliency
     global enable_debug_methods
     global stats_frequency
+    global stats_resolve_hostnames
     global static_dir, graph_dir, template_dir
 
     _config = ConfigParser.SafeConfigParser()
@@ -125,3 +126,4 @@ def read_config(filename):
             "static"))
     graph_dir = _get(_config, "stats", "graph_dir", os.path.join(static_dir, "graph"))
     template_dir = _get(_config, "stats", "template_dir", os.path.join(package_dir, "template"))
+    stats_resolve_hostnames = _getboolean(_config, "stats", "resolve_hostnames", True)

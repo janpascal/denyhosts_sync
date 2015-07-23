@@ -56,9 +56,11 @@ def fixup_crackers(hosts):
             logging.debug("Exception looking up country for {}: {}".format(host.ip_address, e))
             host.country = ''
         try:
-            hostinfo = socket.gethostbyaddr(host.ip_address)
-            host.hostname = hostinfo[0]
-            #host.hostname = 'disabled'
+            if config.stats_resolve_hostnames:
+                hostinfo = socket.gethostbyaddr(host.ip_address)
+                host.hostname = hostinfo[0]
+            else:
+                host.hostname = 'disabled'
         except Exception, e:
             logging.debug("Exception looking up reverse DNS for {}: {}".format(host.ip_address, e))
             host.hostname = host.ip_address
