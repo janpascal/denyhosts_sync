@@ -1,0 +1,49 @@
+.TH dh_syncserver 1 "Fri Juli 24 23:51:12 CEST 2015"
+.SH NAME
+.B dh_syncserver
+- service to share blocked addresses from denyhosts.
+.SH SYNOPSIS
+.B dh_syncserver [-h] [-c CONFIG] [--recreate-database]
+.B   [--evolve-database] [--purge-legacy-addresses]
+.B   [--purge-reported-addresses] [--purge-ip IP_ADDRESS] [-f]
+.SH DESCRIPTION
+.PP
+dh_syncserver is a server that allows denyhosts clients to share blocked IP
+addresses. It is intended to be a drop-in replacement for the service at
+xmlrpc.denyhosts.net that up to now has been provided by the original author
+of denyhosts.
+
+.SH "OPTIONS
+.TP
+.B \-h
+Print help information and exit.
+.TP
+.B \-c CONFIG
+Read configuration from CONFIG
+.TP
+.B \-\-recreate-database
+If necessary, remove old database tables, then create new tables and exit.
+.TP
+.B \-\-evolve-database
+Update database schema to the latest version and exit.
+.TP
+.B \-\-purge-legacy-addresses
+Purge all ip addresses previously downloaded from the legacy server and exit.
+.TP
+.B \-\-purge-reported-addresses
+Purge all ip addresses previously reported by denyhosts clients and exit.
+.TP
+.B \-\-purge-ip IP_ADDRESS
+Purge given IP address from the database and exit. The address is purged
+from the legacy table and from the reports by denyhosts clients.
+.TP
+.B \-f, \-\-force
+When the \-\-recreate-database, \-\-evolve-database, \-\-purge-legacy-addresses,
+\-\-purge-reported-addresses or \-\-purge-ip are given, execute the given
+operation directly without asking questions.
+
+.SH AUTHOR
+Jan-Pascal van Best <janpascal@vanbest.org>
+.SH SEE ALSO
+.B denyhosts
+(1)
