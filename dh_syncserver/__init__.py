@@ -6,5 +6,5 @@ U{Twistar <http://findingscience.com/twistar>} as an ORM layer.
 
 @author: Jan-Pascal van Best U{janpascal@vanbest.org}
 """
-version_info = (1, 1, "devel")
+version_info = (1, 1)
 version = '.'.join(map(str, version_info))
