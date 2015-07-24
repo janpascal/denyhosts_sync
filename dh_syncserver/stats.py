@@ -77,7 +77,7 @@ def update_stats_cache():
         returnValue(None)
     _stats_busy = True
 
-    logging.info("Updating statistics cache...")
+    logging.debug("Updating statistics cache...")
     now = time.time()
     stats = {}
     stats["last_updated"] = now

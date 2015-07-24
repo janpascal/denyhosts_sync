@@ -42,18 +42,14 @@ def stop_reactor(value):
     print(value)
     reactor.stop()
 
-web_root = None
-main_xmlrpc_handler = None
-stats_resource = None
-web_static = None
-
 def sighup_handler(signum, frame):
     global configfile
     global main_xmlrpc_handler
 
     logging.warning("Received SIGHUP, reloading configuration file...")
     debug_was_on = config.enable_debug_methods
-    old_listen_port = config.listen_port
+    old_xmlrpc_listen_port = config.xmlrpc_listen_port
+    old_stats_listen_port = config.stats_listen_port
     config.read_config(configfile)
 
     configure_logging()
@@ -68,17 +64,73 @@ def sighup_handler(signum, frame):
         d = debug_views.DebugServer(main_xmlrpc_handler)
         main_xmlrpc_handler.putSubHandler('debug', d)
 
-    if config.listen_port != old_listen_port:
-        start_listening(config.listen_port)
+    stop_listening().addCallback(lambda _: start_listening())
 
-_listener = None
-def start_listening(port, interface=''):
-    global _listener
-    global main_xmlrpc_handler, web_root
+_xmlrpc_listener = None
+_stats_listener = None
+# Returns a callback. Wait on it before the port(s) are actually closed
+def stop_listening():
+    logging.debug("main.stop_listening()")
+    global _xmlrpc_listener
+    global _stats_listener
 
-    if _listener is not None:
-        _listener.stopListening()
-    _listener = reactor.listenTCP(port, server.Site(web_root), interface=interface)
+    # It's not easy to actually close a listening port.
+    # You need to close both the port and the protocol,
+    # and wait for them
+    if _xmlrpc_listener is not None:
+        deferred = _xmlrpc_listener.stopListening()
+        deferred.addCallback(_xmlrpc_listener.loseConnection)
+    else:
+        deferred = Deferred()
+
+    if _stats_listener is not None:
+        deferred.addCallback(_stats_listener.stopListening)
+        deferred.addCallback(_stats_listener.loseConnection)
+
+    _xmlrpc_listener = None
+    _stats_listener = None
+
+    return deferred
+
+def start_listening():
+    logging.debug("main.start_listening()")
+    global _xmlrpc_listener
+    global _stats_listener
+
+    # Configure web resources
+    main_xmlrpc_handler = views.Server()
+    stats_resource = views.WebResource()
+    web_static = static.File(config.static_dir)
+    web_graphs = static.File(config.graph_dir)
+
+    # Roots
+    if config.stats_listen_port == config.xmlrpc_listen_port:
+        xmlrpc_root = stats_resource
+    else:
+        xmlrpc_root = resource.Resource()
+    stats_root = stats_resource
+
+    # /RPC2
+    xmlrpc_root.putChild('RPC2', main_xmlrpc_handler)
+
+    # xmlrpc debug handler
+    if config.enable_debug_methods:
+        d = debug_views.DebugServer(main_xmlrpc_handler)
+        main_xmlrpc_handler.putSubHandler('debug', d)
+
+    # /static
+    stats_root.putChild('static', web_static)
+    # /static/graphs
+    web_static.putChild('graphs', web_graphs)
+
+    logging.info("Start listening on port {}".format(config.xmlrpc_listen_port))
+    _xmlrpc_listener = reactor.listenTCP(config.xmlrpc_listen_port, server.Site(xmlrpc_root))
+
+    if config.stats_listen_port == config.xmlrpc_listen_port:
+        _stats_listener = None
+    else:
+        logging.info("Start serving statistics on port {}".format(config.stats_listen_port))
+        _stats_listener = reactor.listenTCP(config.stats_listen_port, server.Site(stats_root))
 
 maintenance_job = None
 legacy_sync_job = None
@@ -190,24 +242,7 @@ def run_main():
         signal.signal(signal.SIGHUP, sighup_handler)
         reactor.addSystemEventTrigger("after", "startup", database.check_database_version)
 
-        # Configure web resources
-        web_root = resource.Resource()
-        main_xmlrpc_handler = views.Server()
-        stats_resource = views.WebResource()
-        web_static = static.File(config.static_dir)
-        web_graphs = static.File(config.graph_dir)
-        # /RPC2
-        web_root.putChild('RPC2', main_xmlrpc_handler)
-        # /stats
-        web_root.putChild('stats', stats_resource)
-        # /static
-        web_root.putChild('static', web_static)
-        # /static/graphs
-        web_static.putChild('graphs', web_graphs)
-        if config.enable_debug_methods:
-            d = debug_views.DebugServer(main_xmlrpc_handler)
-            main_xmlrpc_handler.putSubHandler('debug', d)
-        start_listening(config.listen_port)
+        start_listening()
 
         # Set up maintenance and legacy sync jobs
         schedule_jobs()

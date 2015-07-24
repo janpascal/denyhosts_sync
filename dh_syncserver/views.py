@@ -127,11 +127,10 @@ class Server(xmlrpc.XMLRPC):
 class WebResource(Resource):
     #isLeaf = True
 
-    #def getChild(self, name, request):
-    #    logging.debug("getChild({},{})".format(name,request))
-    #    if name == '':
-    #        return self
-    #    return Resource.getChild(self, name, request)
+    def getChild(self, name, request):
+        if name == '':
+            return self
+        return Resource.getChild(self, name, request)
 
     def render_GET(self, request):
         logging.debug("GET({})".format(request))
@@ -143,10 +142,6 @@ class WebResource(Resource):
                 request.write(result.encode('utf-8'))
             request.finish()
         def fail(err):
-            #request.setResponseCode(501)
-            #request.write("Server error")
-            #request.write(str(err))
-            #request.finish()
             request.processingFailed(err)
         stats.render_stats().addCallbacks(done, fail)
         return server.NOT_DONE_YET

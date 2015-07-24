@@ -1,6 +1,6 @@
 Release 1.1pre (2015-07-XX)
 - Moved XMLRPC location to the more standard http://your.host.name:9911/RPC2
-- Added server statistics page at http://your.host.name:9911/stats
+- Added server statistics page at http://your.host.name:9911
   When updating, please review the [stats] section of the configuration file.
 - Write periodical basic database state to log file
 - Improved error handling

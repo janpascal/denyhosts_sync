@@ -54,13 +54,14 @@ def read_config(filename):
     global max_reported_crackers
     global logfile
     global loglevel
-    global listen_port
+    global xmlrpc_listen_port
     global legacy_server
     global legacy_frequency
     global legacy_threshold, legacy_resiliency
     global enable_debug_methods
     global stats_frequency
     global stats_resolve_hostnames
+    global stats_listen_port
     global static_dir, graph_dir, template_dir
 
     _config = ConfigParser.SafeConfigParser()
@@ -100,7 +101,7 @@ def read_config(filename):
     legacy_expiry_days = _getfloat(_config, "maintenance", "legacy_expiry_days", 30)
 
     max_reported_crackers = _getint(_config, "sync", "max_reported_crackers", 50)
-    listen_port = _getint(_config, "sync", "listen_port", 9911)
+    xmlrpc_listen_port = _getint(_config, "sync", "listen_port", 9911)
     enable_debug_methods = _getboolean(_config, "sync", "enable_debug_methods", False)
     legacy_server = _get(_config, "sync", "legacy_server", None)
     legacy_frequency = _getint(_config, "sync", "legacy_frequency", 300)
@@ -127,3 +128,4 @@ def read_config(filename):
     graph_dir = _get(_config, "stats", "graph_dir", os.path.join(static_dir, "graph"))
     template_dir = _get(_config, "stats", "template_dir", os.path.join(package_dir, "template"))
     stats_resolve_hostnames = _getboolean(_config, "stats", "resolve_hostnames", True)
+    stats_listen_port = _getint(_config, "stats", "listen_port", 9911)

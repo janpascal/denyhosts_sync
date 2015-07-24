@@ -59,7 +59,11 @@ to use the new synchronisation server by setting
 SYNC_SERVER=http://your.host.name:9911
 ```
 Once the server is running, you can watch the statistics page at
-`http://your.host.name:9911/stats`
+`http://your.host.name:9911`
+
+These URLs look the same, but the xmlrpc library from the `DenyHosts`
+client will actually connect to `http://your.host.name:9911/RPC2`. The port
+numbers are configurable.
 
 ## Signals
 When `dh_syncserver` receives the `SIGHUP` signal, it will re-read the
