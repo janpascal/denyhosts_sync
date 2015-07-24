@@ -20,7 +20,15 @@ setup(name='dh_syncserver',
         ('static/css', glob('static/css/*.css')),
         ('static/graph', glob('static/graph/README')),
         ('template', glob('template/*')),
-        ('docs', glob('docs/*') + glob('README.md')),
+        ('docs', [
+                    'README.md', 
+                    'LICENSE.md', 
+                    'changelog.txt', 
+                    'dh_syncserver.conf.example',
+                    'dh_syncserver.service.example', 
+                    'dh_syncserver.init.example' 
+                ]
+        ),
       ],
       license="""
 Copyright (C) 2015 Jan-Pascal van Best <janpascal@vanbest.org>

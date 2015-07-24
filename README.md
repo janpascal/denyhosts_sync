@@ -41,8 +41,7 @@ file in `/etc/dh_syncserver.conf` and the Python script
 
 ## Configuration
 Create the database and a database user with full rights to it. Copy the
-`dh_syncserver.conf.example` from the `docs` directory to
-`/etc/dh_syncserver.conf` and edit it.
+`dh_syncserver.conf.example` file to `/etc/dh_syncserver.conf` and edit it.
 Fill in the database parameters, the location of the log file (which should be
 writable by the system user that will be running dh_syncserver) and
 other settings you wish to change. `graph_dir` in the `stats` sections is

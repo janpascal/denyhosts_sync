@@ -165,7 +165,7 @@ def configure_logging():
     # Use basic configuration
     logging.basicConfig(filename=config.logfile,
         level=config.loglevel,
-        format="%(asctime)s %(levelname)-8s %(message)s",
+        format="%(asctime)s %(module)-8s %(levelname)-8s %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S")
 
     # Collect Twisted log messages in Python logging system
