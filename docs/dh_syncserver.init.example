@@ -1,0 +1,66 @@
+#! /bin/sh
+#
+### BEGIN INIT INFO
+# Provides:          dh_syncserver
+# Required-Start:    $syslog $network $remote_fs
+# Required-Stop:     $syslog $network $remote_fs
+# Should-Start:      mysql
+# Should-Stop:       mysql
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: DenyHosts synchronisation service
+### END INIT INFO
+
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+DAEMON=/usr/local/bin/dh_syncserver
+DESC="DenyHosts sync server"
+NAME=`basename $DAEMON`
+PIDFILE=/var/run/$NAME.pid
+DAEMONUSER=dh_syncserver
+CONFIG_FILE=/etc/dh_syncserver.conf
+QUIET=--quiet
+
+test -x $DAEMON || exit 0
+
+# Include defaults if available
+if [ -f /etc/default/dh_syncserver ] ; then
+	. /etc/default/dh_syncserver
+fi
+DAEMON_ARGS="-c $CONFIG_FILE"
+
+#set -e
+
+. /lib/lsb/init-functions
+
+case "$1" in
+  start)
+	log_begin_msg "Starting $DESC: $NAME"
+        start-stop-daemon --start $QUIET --chuid $DAEMONUSER \
+                --make-pidfile --pidfile $PIDFILE --background \
+                --startas /bin/bash -- -c "exec $DAEMON $DAEMON_ARGS >> /var/log/dh_syncserver/console.log 2>&1"
+	log_end_msg $?
+	;;
+  stop)
+	log_begin_msg "Stopping $DESC: $NAME"
+        start-stop-daemon --stop $QUIET --chuid $DAEMONUSER \
+                --pidfile $PIDFILE \
+                --startas /bin/bash -- -c "exec $DAEMON $DAEMON_ARGS >> /var/log/dh_syncserver/console.log 2>&1"
+	log_end_msg $?
+	;;
+  restart)
+	$0 stop
+	$0 start
+	;;
+  reload|force-reload)
+	log_begin_msg "Reloading $DESC: $NAME"
+	start-stop-daemon --stop --signal HUP --pidfile $PIDFILE
+	log_end_msg $?
+	;;
+  *)
+	N=/etc/init.d/$NAME
+	echo "Usage: $N {start|stop|restart|reload|force-reload}" >&2
+	exit 1
+	;;
+esac
+
+exit 0
