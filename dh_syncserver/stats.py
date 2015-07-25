@@ -26,6 +26,7 @@ import logging
 
 from twisted.internet import reactor, threads
 from twisted.internet.defer import inlineCallbacks, returnValue
+from twisted.python import log
 
 from jinja2 import Template, Environment, FileSystemLoader
 
@@ -189,6 +190,7 @@ def update_stats_cache():
         _cache["stats"] = stats
         _cache["time"] = time.time()
     except Exception, e:
+        log.err(_why="Error updating statistics: {}".format(e))
         logging.warning("Error updating statistics: {}".format(e))
 
     _stats_busy = False
@@ -211,6 +213,7 @@ def render_stats():
         logging.info("Done rendering statistics page...")
         returnValue(html)
     except Exception, e:
+        log.err(_why="Error rendering statistics page: {}".format(e))
         logging.warning("Error creating statistics page: {}".format(e))
 
 # vim: tabstop=8 expandtab shiftwidth=4 softtabstop=4
