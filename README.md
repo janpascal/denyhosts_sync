@@ -20,8 +20,17 @@ of `denyhosts`.
 - MySQL database is preferred for large sites. For testing purposes sqlite is
   also supported
 - Python 2.7 with setuptools
-- The Python twisted framework and the twistar ORM library are installed automatically
-  by the setup.py script
+- The other Python libraries are installed automatically by the setup.py script.
+  The GeoIP library needs the libgeoip development headers. On a Debian system,
+  install them by running `apt-get install libgeoip-dev`. To install the
+  free GeoIP database, run `apt-get install geoip-database`.
+  Note: To install the Python GeoIP library on FreeBSD, edit your
+  `~/.pydistutils.cfg` to contain the following:
+  ```
+  [build_ext]
+  include_dirs=/usr/local/include
+  library_dirs=/usr/local/lib
+  ```
 - `dh_syncserver` is developed and tested on a Debian GNU/Linux system. It should
   work on any Linux system with Python. Microsoft Windows is not a supported
   platform, although it should work without major modifications.
@@ -62,7 +71,8 @@ Once the server is running, you can watch the statistics page at
 
 These URLs look the same, but the xmlrpc library from the `DenyHosts`
 client will actually connect to `http://your.host.name:9911/RPC2`. The port
-numbers are configurable.
+numbers are configurable. The statistics page can be on the same port as
+the RPC server, or on another.
 
 ## Signals
 When `dh_syncserver` receives the `SIGHUP` signal, it will re-read the
