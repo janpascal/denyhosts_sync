@@ -160,9 +160,13 @@ def update_stats_cache():
         first_time  = yield database.run_query("""
             SELECT MIN(first_report_time) FROM reports
             """)
-        dt_first = datetime.datetime.fromtimestamp(first_time[0][0])
+        if len(first_time)>0 and first_time[0][0] is not None:
+            dt_first = datetime.datetime.fromtimestamp(first_time[0][0])
+        else:
+            dt_first= datetime.datetime.today()
         dt_firstday = dt_first.replace(hour=0, minute=0, second=0, microsecond=0)
         firstday = int(dt_firstday.strftime("%s"))
+
         rows = yield database.run_query(""" 
             SELECT CAST((start_time-?)/24/3600 AS UNSIGNED INTEGER) AS day, COUNT(*) AS count
             FROM (

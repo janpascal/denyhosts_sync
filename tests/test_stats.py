@@ -18,6 +18,7 @@ import inspect
 import os
 import os.path
 import time
+import traceback
 
 from dh_syncserver.models import Cracker, Report, Legacy
 from dh_syncserver import config
@@ -46,18 +47,7 @@ class StatsTest(base.TestBase):
         self.assertEqual(c2.hostname, "github.com", "Reverse DNS of github.com")
         self.assertEqual(c2.country, "United States", "Testing geoip of github.com")
 
-    @inlineCallbacks
-    def prepare_stats(self):
-        now = time.time()
-        c1 = yield Cracker(ip_address="192.168.1.1", first_time=now, latest_time=now, total_reports=0, current_reports=0).save()
-        c2 = yield Cracker(ip_address="192.168.1.2", first_time=now, latest_time=now, total_reports=0, current_reports=0).save()
-
-        yield controllers.add_report_to_cracker(c1, "127.0.0.1", when=now)
-        yield controllers.add_report_to_cracker(c1, "127.0.0.2", when=now)
-        yield controllers.add_report_to_cracker(c1, "127.0.0.3", when=now)
-        yield controllers.add_report_to_cracker(c2, "127.0.0.2", when=now)
-        yield controllers.add_report_to_cracker(c2, "127.0.0.3", when=now+1)
-
+    def stats_settings(self):
         tests_dir = os.path.dirname(inspect.getsourcefile(self.__class__))
         package_dir = os.path.dirname(tests_dir)
         config.static_dir = os.path.join(package_dir, "static")
@@ -69,7 +59,39 @@ class StatsTest(base.TestBase):
             pass
         config.stats_resolve_hostnames = False
 
+
+    @inlineCallbacks
+    def prepare_stats(self):
+        self.stats_settings()
+
+        now = time.time()
+        c1 = yield Cracker(ip_address="192.168.1.1", first_time=now, latest_time=now, total_reports=0, current_reports=0).save()
+        c2 = yield Cracker(ip_address="192.168.1.2", first_time=now, latest_time=now, total_reports=0, current_reports=0).save()
+
+        yield controllers.add_report_to_cracker(c1, "127.0.0.1", when=now)
+        yield controllers.add_report_to_cracker(c1, "127.0.0.2", when=now)
+        yield controllers.add_report_to_cracker(c1, "127.0.0.3", when=now)
+        yield controllers.add_report_to_cracker(c2, "127.0.0.2", when=now)
+        yield controllers.add_report_to_cracker(c2, "127.0.0.3", when=now+1)
+
         yield stats.update_stats_cache()
+
+    @inlineCallbacks
+    def test_empty_state(self):
+        self.stats_settings()
+
+        yield stats.update_stats_cache()
+        self.assertIsNotNone(stats._cache, "Stats for empty database should not be None")
+
+        cached = stats._cache["stats"]
+        self.assertEqual(cached["num_hosts"], 0, "Number of hosts in empty database")
+        self.assertEqual(cached["num_reports"], 0, "Number of reports in empty database")
+        self.assertEqual(cached["num_clients"], 0, "Number of clients in empty database")
+
+        html = yield stats.render_stats()
+        #print(html)
+        self.assertTrue("Number of clients" in html, "HTML should contain number of clients")
+        self.assertTrue("../static/graphs/hourly.svg" in html, "HTML should contain path to hourly graph")
 
     @inlineCallbacks
     def test_stats_cache(self):
