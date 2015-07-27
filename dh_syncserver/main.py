@@ -101,6 +101,7 @@ def start_listening():
     main_xmlrpc_handler = views.Server()
     stats_resource = views.WebResource()
     web_static = static.File(config.static_dir)
+    static.File.contentTypes['.svg'] = 'image/svg+xml'
     web_graphs = static.File(config.graph_dir)
 
     # Roots
