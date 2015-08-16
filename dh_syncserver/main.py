@@ -152,11 +152,11 @@ def schedule_jobs():
     legacy_sync_job = task.LoopingCall(controllers.download_from_legacy_server)
     legacy_sync_job.start(config.legacy_frequency, now=False)
 
-    # Reschedule legacy sync job
+    # Reschedule stats job
     if stats_job is not None:
         stats_job.stop()
     stats_job = task.LoopingCall(stats.update_stats_cache)
-    stats_job.start(config.stats_frequency, now=False)
+    stats_job.start(config.stats_frequency, now=True)
 
 def configure_logging():
     # Remove all handlers associated with the root logger object.

@@ -24,7 +24,7 @@ import os.path
 import time
 import logging
 
-from twisted.internet import reactor, threads
+from twisted.internet import reactor, threads, task
 from twisted.internet.defer import inlineCallbacks, returnValue
 from twisted.python import log
 
@@ -193,6 +193,7 @@ def update_stats_cache():
             _cache = {}
         _cache["stats"] = stats
         _cache["time"] = time.time()
+        logging.debug("Finished updating statistics cache...")
     except Exception, e:
         log.err(_why="Error updating statistics: {}".format(e))
         logging.warning("Error updating statistics: {}".format(e))
@@ -204,8 +205,9 @@ def render_stats():
     global _cache
     logging.info("Rendering statistics page...")
     if _cache is None:
-        logging.debug("No statistics cached yet, doing that now...")
-        yield update_stats_cache()
+        while _cache is None:
+            logging.debug("No statistics cached yet, waiting for cache generation to finish...")
+            yield task.deferLater(reactor, 1, lambda _:0, 0)
 
     now = time.time()
     try:
