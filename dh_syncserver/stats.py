@@ -61,7 +61,7 @@ def fixup_crackers(hosts):
                 hostinfo = socket.gethostbyaddr(host.ip_address)
                 host.hostname = hostinfo[0]
             else:
-                host.hostname = 'disabled'
+                host.hostname = host.ip_address
         except Exception, e:
             logging.debug("Exception looking up reverse DNS for {}: {}".format(host.ip_address, e))
             host.hostname = host.ip_address
