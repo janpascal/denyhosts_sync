@@ -19,10 +19,10 @@
 
 import config
 import datetime
-import socket
-import os.path
-import time
 import logging
+import os.path
+import socket
+import time
 
 from twisted.internet import reactor, threads, task
 from twisted.internet.defer import inlineCallbacks, returnValue
@@ -32,8 +32,9 @@ from jinja2 import Template, Environment, FileSystemLoader
 
 import GeoIP
 
-import pygal
-from pygal.style import CleanStyle
+import matplotlib
+import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
 
 import models
 import database
@@ -46,6 +47,34 @@ def format_datetime(value, format='medium'):
     elif format == 'medium':
         format="%a %d-%m-%Y %H:%M:%S"
     return dt.strftime(format)
+
+def insert_zeroes(rows, max):
+    result  = []
+    index = 0
+    for hour in xrange(max):
+        if index < len(rows) and rows[index][0] == hour:
+            result.append(rows[index])
+            index += 1
+        else:
+            result.append((hour,0))
+    return result
+
+def humanize_number(number, pos):
+    """Return a humanized string representation of a number."""
+    abbrevs = (
+        (1E15, 'P'),
+        (1E12, 'T'),
+        (1E9, 'G'),
+        (1E6, 'M'),
+        (1E3, 'k'),
+        (1, '')
+    )
+    if number < 1000:
+        return str(number)
+    for factor, suffix in abbrevs:
+        if number >= factor:
+            break
+    return '%.*f%s' % (0, number / factor, suffix)
 
 # Functions containing blocking io, call from thread!
 def fixup_crackers(hosts):
@@ -120,20 +149,31 @@ def update_stats_cache():
         dt_start = dt_onthehour - datetime.timedelta(days=1)
         yesterday = int(dt_start.strftime('%s'))
 
-        # FIXME: because of the SQL queries used, hours without any reports will 
-        # be omitted from the resulting graph
         rows = yield database.run_query("""
             SELECT CAST((first_report_time-?)/3600 AS UNSIGNED INTEGER), count(*)
             FROM reports
             WHERE first_report_time > ?
             GROUP BY CAST((first_report_time-?)/3600 AS UNSIGNED INTEGER)
             """, yesterday, yesterday, yesterday)
-        hourly_chart = pygal.Line(show_legend = False, style=CleanStyle, human_readable = True)
-        hourly_chart.title = 'Number of reports per hour (until {})'.format( datetime.datetime.fromtimestamp(now).strftime("%d-%m-%Y %H:%M:%S"))
-        hourly_chart.x_labels = [ str((start_hour + row[0]) % 24) for row in rows ]
-        hourly_chart.add('# of reports', [ row[1] for row in rows ])
-        hourly_chart.render_to_file(filename=os.path.join(config.graph_dir, 'hourly.svg'))
+        #logging.debug("Daily: {}".format(rows))
+        rows = insert_zeroes(rows, 25)
+        #logging.debug("Daily: {}".format(rows))
 
+        x = [dt_start + datetime.timedelta(hours=row[0]) for row in rows]
+        y = [row[1] for row in rows]
+
+        fig = plt.figure()
+        ax = fig.gca()
+        ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
+        ax.xaxis.set_major_locator(mdates.HourLocator(interval=4))
+        ax.set_title("Reports per hour")
+        ax.plot(x,y, linestyle='solid', marker='s')
+        ax.set_ybound(lower=0)
+        fig.autofmt_xdate()
+        fig.savefig(os.path.join(config.graph_dir, 'hourly.svg'))
+        fig.clf()
+        plt.close(fig)
+        
         # Calculate start of monthly period: last month on the beginning of the
         # current day
         dt_now = datetime.datetime.fromtimestamp(now)
@@ -143,18 +183,31 @@ def update_stats_cache():
         dt_start = dt_onthehour - datetime.timedelta(weeks=4)
         yestermonth = int(dt_start.strftime('%s'))
 
-        # FIXME: also days without reports will be omitted
         rows = yield database.run_query("""
             SELECT CAST((first_report_time-?)/24/3600 AS UNSIGNED INTEGER), count(*)
             FROM reports
             WHERE first_report_time > ?
             GROUP BY CAST((first_report_time-?)/24/3600 AS UNSIGNED INTEGER)
             """, yestermonth, yestermonth, yestermonth)
-        daily_chart = pygal.Line(show_legend = False, style=CleanStyle, human_readable = True)
-        daily_chart.title = 'Number of reports per day (until {})'.format( datetime.datetime.fromtimestamp(now).strftime("%d-%m-%Y %H:%M:%S"))
-        daily_chart.x_labels = [ str((dt_start + datetime.timedelta(days=row[0])).day) for row in rows ]
-        daily_chart.add('# of reports', [ row[1] for row in rows ])
-        daily_chart.render_to_file(filename=os.path.join(config.graph_dir, 'monthly.svg'))
+
+        rows = insert_zeroes(rows, 29)
+        #logging.debug("Daily: {}".format(rows))
+
+        x = [dt_start + datetime.timedelta(days=row[0]) for row in rows]
+        y = [row[1] for row in rows]
+
+        fig = plt.figure()
+        ax = fig.gca()
+        ax.xaxis.set_major_formatter(mdates.DateFormatter('%d %b'))
+        ax.xaxis.set_major_locator(mdates.DayLocator(interval=4))
+        ax.yaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(humanize_number))
+        ax.set_title("Reports per day")
+        ax.plot(x,y, linestyle='solid', marker='s')
+        ax.set_ybound(lower=0)
+        fig.autofmt_xdate()
+        fig.savefig(os.path.join(config.graph_dir, 'monthly.svg'))
+        fig.clf()
+        plt.close(fig)
 
         # Number of reporters over days
         first_time  = yield database.run_query("""
@@ -166,7 +219,17 @@ def update_stats_cache():
             dt_first= datetime.datetime.today()
         dt_firstday = dt_first.replace(hour=0, minute=0, second=0, microsecond=0)
         firstday = int(dt_firstday.strftime("%s"))
+        num_days = ( datetime.datetime.today() - dt_firstday ).days
+        if num_days < 7:
+            interval = 1
+        elif num_days<15:
+            interval = 2
+        elif num_days<42:
+            interval = 7
+        else:
+            interval = num_days / 6
 
+        # FIXME: doesn't take into account stopped reporters
         rows = yield database.run_query(""" 
             SELECT CAST((start_time-?)/24/3600 AS UNSIGNED INTEGER) AS day, COUNT(*) AS count
             FROM (
@@ -179,15 +242,22 @@ def update_stats_cache():
             """, firstday)
         accumulated_reporters = reduce(lambda l,x: l + ((x[0],l[-1][1]+x[1]),), rows[1:], rows[:1])
         #logging.debug("Reporters: {}".format(accumulated_reporters))
-        reporters_chart = pygal.DateLine(show_legend = False, style=CleanStyle,
-            human_readable = True,
-            x_label_rotation=20)
-        reporters_chart.title = 'Number of contributors'
-        reporters_chart.x_label_format = "%Y-%m-%d"
-        #reporters_chart.x_labels = [ str((dt_firstday+ datetime.timedelta(days=row[0])).day) for row in accumulated_reporters]
-        reporters_chart.add('# of contributors', [ 
-            (dt_firstday + datetime.timedelta(days=row[0]), row[1]) for row in accumulated_reporters])
-        reporters_chart.render_to_file(filename=os.path.join(config.graph_dir, 'contrib.svg'))
+
+        x = [dt_firstday + datetime.timedelta(days=row[0]) for row in accumulated_reporters]
+        y = [row[1] for row in accumulated_reporters]
+        fig = plt.figure()
+        ax = fig.gca()
+        ax.xaxis.set_major_formatter(mdates.DateFormatter('%d %b'))
+        #ax.xaxis.set_major_locator(mdates.DayLocator(interval=4))
+        ax.xaxis.set_major_locator(mdates.DayLocator(interval=interval))
+        ax.yaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(humanize_number))
+        ax.set_title("Number of contributors")
+        ax.plot(x,y, linestyle='solid', marker='s')
+        ax.set_ybound(lower=0)
+        fig.autofmt_xdate()
+        fig.savefig(os.path.join(config.graph_dir, 'contrib.svg'))
+        fig.clf()
+        plt.close(fig)
 
         if _cache is None:
             _cache = {}
