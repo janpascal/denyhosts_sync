@@ -27,12 +27,15 @@ import time
 from twisted.internet import reactor, threads, task
 from twisted.internet.defer import inlineCallbacks, returnValue
 from twisted.python import log
+from twistar.registry import Registry
 
 from jinja2 import Template, Environment, FileSystemLoader
 
 import GeoIP
 
 import matplotlib
+# Prevent errors from matplotlib instantiating a Tk windows
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 
@@ -48,15 +51,18 @@ def format_datetime(value, format='medium'):
         format="%a %d-%m-%Y %H:%M:%S"
     return dt.strftime(format)
 
-def insert_zeroes(rows, max):
-    result  = []
+def insert_zeroes(rows, max = None):
+    result = []
     index = 0
-    for hour in xrange(max):
-        if index < len(rows) and rows[index][0] == hour:
+    if max is None:
+        max = rows[-1][0] + 1
+
+    for value in xrange(max):
+        if index < len(rows) and rows[index][0] == value:
             result.append(rows[index])
             index += 1
         else:
-            result.append((hour,0))
+            result.append((value,0))
     return result
 
 def humanize_number(number, pos):
@@ -94,6 +100,138 @@ def fixup_crackers(hosts):
         except Exception, e:
             logging.debug("Exception looking up reverse DNS for {}: {}".format(host.ip_address, e))
             host.hostname = host.ip_address
+
+def make_daily_graph(txn):
+    # Calculate start of daily period: yesterday on the beginning of the
+    # current hour
+    now = time.time()
+    dt_now = datetime.datetime.fromtimestamp(now)
+    start_hour = dt_now.hour
+    dt_onthehour = dt_now.replace(minute=0, second=0, microsecond=0)
+    dt_start = dt_onthehour - datetime.timedelta(days=1)
+    yesterday = int(dt_start.strftime('%s'))
+
+    txn.execute(database.translate_query("""
+        SELECT CAST((first_report_time-?)/3600 AS UNSIGNED INTEGER), count(*)
+        FROM reports
+        WHERE first_report_time > ?
+        GROUP BY CAST((first_report_time-?)/3600 AS UNSIGNED INTEGER)
+        """), (yesterday, yesterday, yesterday))
+    rows = txn.fetchall()
+    if not rows:
+        return
+    #logging.debug("Daily: {}".format(rows))
+    rows = insert_zeroes(rows, 24)
+    #logging.debug("Daily: {}".format(rows))
+
+    x = [dt_start + datetime.timedelta(hours=row[0]) for row in rows]
+    y = [row[1] for row in rows]
+
+    fig = plt.figure()
+    ax = fig.gca()
+    ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
+    ax.xaxis.set_major_locator(mdates.HourLocator(interval=4))
+    ax.set_title("Reports per hour")
+    ax.plot(x,y, linestyle='solid', marker='s')
+    ax.set_ybound(lower=0)
+    fig.autofmt_xdate()
+    fig.savefig(os.path.join(config.graph_dir, 'hourly.svg'))
+    fig.clf()
+    plt.close(fig)
+    
+def make_monthly_graph(txn):
+    # Calculate start of monthly period: last month on the beginning of the
+    # current day
+    now = time.time()
+    dt_now = datetime.datetime.fromtimestamp(now)
+    start_hour = dt_now.hour
+    start_day =  dt_now.day
+    dt_ontheday = dt_now.replace(hour=0, minute=0, second=0, microsecond=0)
+    dt_start = dt_ontheday - datetime.timedelta(weeks=4)
+    yestermonth = int(dt_start.strftime('%s'))
+
+    txn.execute(database.translate_query("""
+        SELECT CAST((first_report_time-?)/24/3600 AS UNSIGNED INTEGER), count(*)
+        FROM reports
+        WHERE first_report_time > ?
+        GROUP BY CAST((first_report_time-?)/24/3600 AS UNSIGNED INTEGER)
+        """), (yestermonth, yestermonth, yestermonth))
+    rows = txn.fetchall()
+    if not rows:
+        return
+
+    rows = insert_zeroes(rows, 28)
+    #logging.debug("Daily: {}".format(rows))
+
+    x = [dt_start + datetime.timedelta(days=row[0]) for row in rows]
+    y = [row[1] for row in rows]
+
+    fig = plt.figure()
+    ax = fig.gca()
+    ax.xaxis.set_major_formatter(mdates.DateFormatter('%d %b'))
+    ax.xaxis.set_major_locator(mdates.DayLocator(interval=4))
+    ax.yaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(humanize_number))
+    ax.set_title("Reports per day")
+    ax.plot(x,y, linestyle='solid', marker='s')
+    ax.set_ybound(lower=0)
+    fig.autofmt_xdate()
+    fig.savefig(os.path.join(config.graph_dir, 'monthly.svg'))
+    fig.clf()
+    plt.close(fig)
+
+def make_contrib_graph(txn):
+    # Number of reporters over days
+    txn.execute(database.translate_query("""
+        SELECT MIN(first_report_time) FROM reports
+        """))
+    first_time = txn.fetchall()
+    if first_time is not None and len(first_time)>0 and first_time[0][0] is not None:
+        dt_first = datetime.datetime.fromtimestamp(first_time[0][0])
+    else:
+        dt_first= datetime.datetime.today()
+    dt_firstday = dt_first.replace(hour=0, minute=0, second=0, microsecond=0)
+    firstday = int(dt_firstday.strftime("%s"))
+    num_days = ( datetime.datetime.today() - dt_firstday ).days
+    if num_days < 7:
+        interval = 1
+    elif num_days<15:
+        interval = 2
+    elif num_days<42:
+        interval = 7
+    else:
+        interval = num_days / 6
+
+    # FIXME: doesn't take into account stopped reporters
+    txn.execute(database.translate_query("""
+        SELECT day, COUNT(*) AS count
+        FROM (
+            SELECT CAST((first_report_time-?)/24/3600 AS UNSIGNED INTEGER) AS `day`, `ip_address`
+            FROM reports 
+            GROUP BY `day`, `ip_address`
+            ) AS series 
+       GROUP BY day 
+       ORDER BY day ASC
+        """), (firstday,))
+    rows = txn.fetchall()
+    if rows is None:
+        return
+    rows = insert_zeroes(rows, num_days)
+
+    x = [dt_firstday + datetime.timedelta(days=row[0]) for row in rows]
+    y = [row[1] for row in rows]
+    fig = plt.figure()
+    ax = fig.gca()
+    ax.xaxis.set_major_formatter(mdates.DateFormatter('%d %b'))
+    #ax.xaxis.set_major_locator(mdates.DayLocator(interval=4))
+    ax.xaxis.set_major_locator(mdates.DayLocator(interval=interval))
+    ax.yaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(humanize_number))
+    ax.set_title("Number of contributors")
+    ax.plot(x,y, linestyle='solid', marker='s')
+    ax.set_ybound(lower=0)
+    fig.autofmt_xdate()
+    fig.savefig(os.path.join(config.graph_dir, 'contrib.svg'))
+    fig.clf()
+    plt.close(fig)
 
 _cache = None
 _stats_busy = False
@@ -141,123 +279,12 @@ def update_stats_cache():
         logging.info("Stats: {} reports for {} hosts from {} reporters".format(
             stats["num_reports"], stats["num_hosts"], stats["num_clients"]))
 
-        # Calculate start of daily period: yesterday on the beginning of the
-        # current hour
-        dt_now = datetime.datetime.fromtimestamp(now)
-        start_hour = dt_now.hour
-        dt_onthehour = dt_now.replace(minute=0, second=0, microsecond=0)
-        dt_start = dt_onthehour - datetime.timedelta(days=1)
-        yesterday = int(dt_start.strftime('%s'))
-
-        rows = yield database.run_query("""
-            SELECT CAST((first_report_time-?)/3600 AS UNSIGNED INTEGER), count(*)
-            FROM reports
-            WHERE first_report_time > ?
-            GROUP BY CAST((first_report_time-?)/3600 AS UNSIGNED INTEGER)
-            """, yesterday, yesterday, yesterday)
-        #logging.debug("Daily: {}".format(rows))
-        rows = insert_zeroes(rows, 25)
-        #logging.debug("Daily: {}".format(rows))
-
-        x = [dt_start + datetime.timedelta(hours=row[0]) for row in rows]
-        y = [row[1] for row in rows]
-
-        fig = plt.figure()
-        ax = fig.gca()
-        ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
-        ax.xaxis.set_major_locator(mdates.HourLocator(interval=4))
-        ax.set_title("Reports per hour")
-        ax.plot(x,y, linestyle='solid', marker='s')
-        ax.set_ybound(lower=0)
-        fig.autofmt_xdate()
-        fig.savefig(os.path.join(config.graph_dir, 'hourly.svg'))
-        fig.clf()
-        plt.close(fig)
-        
-        # Calculate start of monthly period: last month on the beginning of the
-        # current day
-        dt_now = datetime.datetime.fromtimestamp(now)
-        start_hour = dt_now.hour
-        start_day =  dt_now.day
-        dt_ontheday = dt_now.replace(hour=0, minute=0, second=0, microsecond=0)
-        dt_start = dt_onthehour - datetime.timedelta(weeks=4)
-        yestermonth = int(dt_start.strftime('%s'))
-
-        rows = yield database.run_query("""
-            SELECT CAST((first_report_time-?)/24/3600 AS UNSIGNED INTEGER), count(*)
-            FROM reports
-            WHERE first_report_time > ?
-            GROUP BY CAST((first_report_time-?)/24/3600 AS UNSIGNED INTEGER)
-            """, yestermonth, yestermonth, yestermonth)
-
-        rows = insert_zeroes(rows, 29)
-        #logging.debug("Daily: {}".format(rows))
-
-        x = [dt_start + datetime.timedelta(days=row[0]) for row in rows]
-        y = [row[1] for row in rows]
-
-        fig = plt.figure()
-        ax = fig.gca()
-        ax.xaxis.set_major_formatter(mdates.DateFormatter('%d %b'))
-        ax.xaxis.set_major_locator(mdates.DayLocator(interval=4))
-        ax.yaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(humanize_number))
-        ax.set_title("Reports per day")
-        ax.plot(x,y, linestyle='solid', marker='s')
-        ax.set_ybound(lower=0)
-        fig.autofmt_xdate()
-        fig.savefig(os.path.join(config.graph_dir, 'monthly.svg'))
-        fig.clf()
-        plt.close(fig)
-
-        # Number of reporters over days
-        first_time  = yield database.run_query("""
-            SELECT MIN(first_report_time) FROM reports
-            """)
-        if len(first_time)>0 and first_time[0][0] is not None:
-            dt_first = datetime.datetime.fromtimestamp(first_time[0][0])
-        else:
-            dt_first= datetime.datetime.today()
-        dt_firstday = dt_first.replace(hour=0, minute=0, second=0, microsecond=0)
-        firstday = int(dt_firstday.strftime("%s"))
-        num_days = ( datetime.datetime.today() - dt_firstday ).days
-        if num_days < 7:
-            interval = 1
-        elif num_days<15:
-            interval = 2
-        elif num_days<42:
-            interval = 7
-        else:
-            interval = num_days / 6
-
-        # FIXME: doesn't take into account stopped reporters
-        rows = yield database.run_query(""" 
-            SELECT CAST((start_time-?)/24/3600 AS UNSIGNED INTEGER) AS day, COUNT(*) AS count
-            FROM (
-                SELECT MIN(first_report_time) AS start_time 
-                FROM reports 
-                GROUP BY ip_address
-                ) AS series 
-           GROUP BY day 
-           ORDER BY day ASC
-            """, firstday)
-        accumulated_reporters = reduce(lambda l,x: l + ((x[0],l[-1][1]+x[1]),), rows[1:], rows[:1])
-        #logging.debug("Reporters: {}".format(accumulated_reporters))
-
-        x = [dt_firstday + datetime.timedelta(days=row[0]) for row in accumulated_reporters]
-        y = [row[1] for row in accumulated_reporters]
-        fig = plt.figure()
-        ax = fig.gca()
-        ax.xaxis.set_major_formatter(mdates.DateFormatter('%d %b'))
-        #ax.xaxis.set_major_locator(mdates.DayLocator(interval=4))
-        ax.xaxis.set_major_locator(mdates.DayLocator(interval=interval))
-        ax.yaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(humanize_number))
-        ax.set_title("Number of contributors")
-        ax.plot(x,y, linestyle='solid', marker='s')
-        ax.set_ybound(lower=0)
-        fig.autofmt_xdate()
-        fig.savefig(os.path.join(config.graph_dir, 'contrib.svg'))
-        fig.clf()
-        plt.close(fig)
+        yield Registry.DBPOOL.runInteraction(make_daily_graph)
+        yield Registry.DBPOOL.runInteraction(make_monthly_graph)
+        yield Registry.DBPOOL.runInteraction(make_contrib_graph)
+        #yield threads.deferToThread(make_daily_graph)
+        #yield threads.deferToThread(make_monthly_graph)
+        #yield threads.deferToThread(make_contrib_graph)
 
         if _cache is None:
             _cache = {}

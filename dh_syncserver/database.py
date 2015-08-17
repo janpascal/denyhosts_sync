@@ -183,23 +183,20 @@ def check_database_version():
 
 # FIXME Not the proper way. What if there's a question mark somewhere
 # else in the query?
-def run_query(query, *args):
+def translate_query(query):
     if config.dbtype == "MySQLdb":
-        query = query.replace('?', '%s')
+        return query.replace('?', '%s')
     elif config.dbtype == "sqlite3":
-        pass
+        return query
     else:
         print("unsupported database {}".format(config.dbtype))
-    return Registry.DBPOOL.runQuery(query, args)
+        return query
+
+def run_query(query, *args):
+    return Registry.DBPOOL.runQuery(translate_query(query), args)
 
 def run_operation(query, *args):
-    if config.dbtype == "MySQLdb":
-        query = query.replace('?', '%s')
-    elif config.dbtype == "sqlite3":
-        pass
-    else:
-        print("unsupported database {}".format(config.dbtype))
-    return Registry.DBPOOL.runOperation(query, args)
+    return Registry.DBPOOL.runOperation(translate_query(query), args)
 
 def run_truncate_query(table):
     if config.dbtype == "MySQLdb":
