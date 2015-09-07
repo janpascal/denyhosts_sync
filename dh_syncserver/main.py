@@ -35,6 +35,7 @@ import controllers
 import config
 import database
 import stats
+import utils
 
 import __init__
 
@@ -66,13 +67,49 @@ def sighup_handler(signum, frame):
 
     stop_listening().addCallback(lambda _: start_listening())
 
+@inlineCallbacks
+def shutdown():
+    global main_xmlrpc_handler
+    global _xmlrpc_listener
+    global _xmlrpc_site
+    try:
+        site = _xmlrpc_site
+        logging.info("shutting down, first closing listening ports...")
+        yield stop_listening()
+
+# This doesn't work, site.session is always empty
+        logging.info("Ports closed, waiting for current sessions to close...")
+        logging.debug("Clients still connected: {}".format(len(site.sessions)))
+        while not len(site.sessions)==0:
+            logging.debug("Waiting, {} sessions still active".format(len(site.sessions)))
+            yield task.deferLater(reactor, 1, lambda _:0, 0)
+
+        logging.info("No more sessions, waiting for locked hosts...")
+        while not utils.none_waiting():
+            logging.info("Waiting to shut down, {} hosts still blocked".format(utils.count_waiting()))
+            yield task.deferLater(reactor, 1, lambda _:0, 0)
+            logging.debug("reactor.getDelayedCalls: {}".format([c.func for c in reactor.getDelayedCalls()]))
+
+        logging.info("All hosts unlocked, waiting 3 more seconds...")
+        yield task.deferLater(reactor, 1, lambda _:0, 0)
+        logging.debug("Waiting 2 more seconds...")
+        yield task.deferLater(reactor, 1, lambda _:0, 0)
+        logging.debug("Waiting 1 more second...")
+        yield task.deferLater(reactor, 1, lambda _:0, 0)
+        logging.info("Continuing shutdown")
+    except:
+        logging.exception("Error in shutdown callback")
+    
 _xmlrpc_listener = None
 _stats_listener = None
+_xmlrpc_site = None
+
 # Returns a callback. Wait on it before the port(s) are actually closed
 def stop_listening():
     logging.debug("main.stop_listening()")
     global _xmlrpc_listener
     global _stats_listener
+    global _xmlrpc_site
 
     # It's not easy to actually close a listening port.
     # You need to close both the port and the protocol,
@@ -89,13 +126,16 @@ def stop_listening():
 
     _xmlrpc_listener = None
     _stats_listener = None
+    _xmlrpc_site = None
 
     return deferred
 
 def start_listening():
     logging.debug("main.start_listening()")
     global _xmlrpc_listener
+    global _xmlrpc_site
     global _stats_listener
+    global main_xmlrpc_handler
 
     # Configure web resources
     main_xmlrpc_handler = views.Server()
@@ -125,7 +165,8 @@ def start_listening():
     web_static.putChild('graphs', web_graphs)
 
     logging.info("Start listening on port {}".format(config.xmlrpc_listen_port))
-    _xmlrpc_listener = reactor.listenTCP(config.xmlrpc_listen_port, server.Site(xmlrpc_root))
+    _xmlrpc_site = server.Site(xmlrpc_root)
+    _xmlrpc_listener = reactor.listenTCP(config.xmlrpc_listen_port, _xmlrpc_site)
 
     if config.stats_listen_port == config.xmlrpc_listen_port:
         _stats_listener = None
@@ -242,6 +283,7 @@ def run_main():
     if not single_shot:
         signal.signal(signal.SIGHUP, sighup_handler)
         reactor.addSystemEventTrigger("after", "startup", database.check_database_version)
+        reactor.addSystemEventTrigger("before", "shutdown", shutdown)
 
         start_listening()
 

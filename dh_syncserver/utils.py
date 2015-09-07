@@ -36,7 +36,14 @@ def wait_and_lock_host(host):
 def unlock_host(host):
     try:
         _hosts_busy.remove(host)
+        #logging.debug("host {} unlocked, {} blocked now".format(host, len(_hosts_busy)))
     except:
         logging.debug("Exception in unlocking {}".format(host), exc_info=True)
+
+def none_waiting():
+    return len(_hosts_busy) == 0
+
+def count_waiting():
+    return len(_hosts_busy)
 
 # vim: tabstop=8 expandtab shiftwidth=4 softtabstop=4
