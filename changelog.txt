@@ -1,3 +1,13 @@
+Release 1.3.0 (2015-09-08)
+- Improve performance, removed some blocking code from the statistics update
+- Better graphs, replaced pygal graphing library with matplotlib
+- Fix crash when statistics page was requested before statistics are ready
+- Show ip address instead of 'disabled' when hostname resolving is disabled
+- Stability fixes
+- Add trend lines to graphs
+- Add historical graph, showing all reports in the database
+- Calculate graphs for stats page in separate thread
+
 Release 1.2.0 (2015-07-31)
 - Fix Content-Type headers of SVG files
 - Fix size of SVG graphs for Internet Explorer
