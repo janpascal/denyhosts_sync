@@ -68,7 +68,7 @@ class StatsTest(base.TestBase):
         c1 = yield Cracker(ip_address="192.168.1.1", first_time=now, latest_time=now, total_reports=0, current_reports=0).save()
         c2 = yield Cracker(ip_address="192.168.1.2", first_time=now, latest_time=now, total_reports=0, current_reports=0).save()
 
-        yield controllers.add_report_to_cracker(c1, "127.0.0.1", when=now)
+        yield controllers.add_report_to_cracker(c1, "127.0.0.1", when=now-25*3600)
         yield controllers.add_report_to_cracker(c1, "127.0.0.2", when=now)
         yield controllers.add_report_to_cracker(c1, "127.0.0.3", when=now)
         yield controllers.add_report_to_cracker(c2, "127.0.0.2", when=now)
@@ -98,6 +98,7 @@ class StatsTest(base.TestBase):
         yield self.prepare_stats()
 
         cached = stats._cache["stats"]
+        print(cached)
         self.assertEqual(cached["num_hosts"], 2, "Number of hosts in database")
         self.assertEqual(cached["num_reports"], 5, "Number of reports in database")
         self.assertEqual(cached["num_clients"], 3, "Number of clients in database")
@@ -124,6 +125,8 @@ class StatsTest(base.TestBase):
         self.assertTrue("Number of clients" in html, "HTML should contain number of clients")
         self.assertTrue("../static/graphs/hourly.svg" in html, "HTML should contain path to hourly graph")
         self.assertFalse("127.0.0.1" in html, "HTML should not contain reported ip addresses")
-        self.assertEqual(html.count("192.168.1.1"), 2, "HTML should contain ip address of hosts in tables")
+        # 4 times, since each occurance is repeated in the hostname field 
+        # (reverse DNS is disabled)
+        self.assertEqual(html.count("192.168.1.1"), 4, "HTML should contain ip address of hosts in tables")
 
 # vim: tabstop=8 expandtab shiftwidth=4 softtabstop=4

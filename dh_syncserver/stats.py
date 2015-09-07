@@ -34,7 +34,7 @@ from jinja2 import Template, Environment, FileSystemLoader
 import GeoIP
 
 import matplotlib
-# Prevent errors from matplotlib instantiating a Tk windows
+# Prevent errors from matplotlib instantiating a Tk window
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
@@ -200,6 +200,8 @@ def make_contrib_graph(txn):
         interval = 7
     else:
         interval = num_days / 6
+    if num_days == 0:
+        return
 
     # FIXME: doesn't take into account stopped reporters
     txn.execute(database.translate_query("""
@@ -279,12 +281,11 @@ def update_stats_cache():
         logging.info("Stats: {} reports for {} hosts from {} reporters".format(
             stats["num_reports"], stats["num_hosts"], stats["num_clients"]))
 
-        yield Registry.DBPOOL.runInteraction(make_daily_graph)
-        yield Registry.DBPOOL.runInteraction(make_monthly_graph)
-        yield Registry.DBPOOL.runInteraction(make_contrib_graph)
-        #yield threads.deferToThread(make_daily_graph)
-        #yield threads.deferToThread(make_monthly_graph)
-        #yield threads.deferToThread(make_contrib_graph)
+        if stats["num_reports"] > 0:
+            yield Registry.DBPOOL.runInteraction(make_daily_graph)
+            yield Registry.DBPOOL.runInteraction(make_monthly_graph)
+            yield Registry.DBPOOL.runInteraction(make_contrib_graph)
+            yield Registry.DBPOOL.runInteraction(make_history_graph)
 
         if _cache is None:
             _cache = {}
