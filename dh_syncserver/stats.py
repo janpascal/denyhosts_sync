@@ -38,6 +38,7 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
+import numpy
 
 import models
 import database
@@ -127,12 +128,22 @@ def make_daily_graph(txn):
     x = [dt_start + datetime.timedelta(hours=row[0]) for row in rows]
     y = [row[1] for row in rows]
 
+    # calc the trendline
+    x_num = mdates.date2num(x)
+    
+    z = numpy.polyfit(x_num, y, 1)
+    p = numpy.poly1d(z)
+    
+    xx = numpy.linspace(x_num.min(), x_num.max(), 100)
+    dd = mdates.num2date(xx)
+    
     fig = plt.figure()
     ax = fig.gca()
     ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
     ax.xaxis.set_major_locator(mdates.HourLocator(interval=4))
     ax.set_title("Reports per hour")
-    ax.plot(x,y, linestyle='solid', marker='s')
+    ax.plot(x,y, linestyle='solid', marker='o', markerfacecolor='blue')
+    ax.plot(dd, p(xx), "b--")
     ax.set_ybound(lower=0)
     fig.autofmt_xdate()
     fig.savefig(os.path.join(config.graph_dir, 'hourly.svg'))
@@ -166,13 +177,23 @@ def make_monthly_graph(txn):
     x = [dt_start + datetime.timedelta(days=row[0]) for row in rows]
     y = [row[1] for row in rows]
 
+    # calc the trendline
+    x_num = mdates.date2num(x)
+    
+    z = numpy.polyfit(x_num, y, 1)
+    p = numpy.poly1d(z)
+    
+    xx = numpy.linspace(x_num.min(), x_num.max(), 100)
+    dd = mdates.num2date(xx)
+    
     fig = plt.figure()
     ax = fig.gca()
     ax.xaxis.set_major_formatter(mdates.DateFormatter('%d %b'))
     ax.xaxis.set_major_locator(mdates.DayLocator(interval=4))
     ax.yaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(humanize_number))
     ax.set_title("Reports per day")
-    ax.plot(x,y, linestyle='solid', marker='s')
+    ax.plot(x,y, linestyle='solid', marker='o', markerfacecolor='blue')
+    ax.plot(dd, p(xx),"b--")
     ax.set_ybound(lower=0)
     fig.autofmt_xdate()
     fig.savefig(os.path.join(config.graph_dir, 'monthly.svg'))
@@ -228,7 +249,10 @@ def make_contrib_graph(txn):
     ax.xaxis.set_major_locator(mdates.DayLocator(interval=interval))
     ax.yaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(humanize_number))
     ax.set_title("Number of contributors")
-    ax.plot(x,y, linestyle='solid', marker='s')
+    if (num_days<100):
+        ax.plot(x,y, linestyle='solid', marker='o', markerfacecolor='blue')
+    else:
+        ax.plot(x,y, linestyle='solid', marker='')
     ax.set_ybound(lower=0)
     fig.autofmt_xdate()
     fig.savefig(os.path.join(config.graph_dir, 'contrib.svg'))
