@@ -141,6 +141,7 @@ def make_daily_graph(txn):
     ax = fig.gca()
     ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
     ax.xaxis.set_major_locator(mdates.HourLocator(interval=4))
+    ax.yaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(humanize_number))
     ax.set_title("Reports per hour")
     ax.plot(x,y, linestyle='solid', marker='o', markerfacecolor='blue')
     ax.plot(dd, p(xx), "b--")
@@ -200,6 +201,66 @@ def make_monthly_graph(txn):
     fig.clf()
     plt.close(fig)
 
+def make_history_graph(txn):
+    # Graph since first record
+    txn.execute(database.translate_query("""
+        SELECT MIN(first_report_time) FROM reports
+        """))
+    first_time = txn.fetchall()
+    if first_time is not None and len(first_time)>0 and first_time[0][0] is not None:
+        dt_first = datetime.datetime.fromtimestamp(first_time[0][0])
+    else:
+        dt_first= datetime.datetime.today()
+    dt_firstday = dt_first.replace(hour=0, minute=0, second=0, microsecond=0)
+    firstday = int(dt_firstday.strftime("%s"))
+    num_days = ( datetime.datetime.today() - dt_firstday ).days
+    logging.debug("First day in data set: {}".format(dt_firstday))
+    logging.debug("Number of days in data set: {}".format(num_days))
+    if num_days == 0:
+        return
+
+    txn.execute(database.translate_query("""
+        SELECT CAST((first_report_time-?)/24/3600 AS UNSIGNED INTEGER) AS `day`, count(*)
+        FROM reports
+        GROUP BY `day`
+        """), (firstday,))
+    rows = txn.fetchall()
+    if not rows:
+        return
+
+    rows = insert_zeroes(rows, num_days)
+
+    x = [dt_firstday + datetime.timedelta(days=row[0]) for row in rows]
+    y = [row[1] for row in rows]
+
+    # calc the trendline
+    x_num = mdates.date2num(x)
+    
+    z = numpy.polyfit(x_num, y, 1)
+    p = numpy.poly1d(z)
+    
+    xx = numpy.linspace(x_num.min(), x_num.max(), 100)
+    dd = mdates.num2date(xx)
+    
+    fig = plt.figure()
+    ax = fig.gca()
+
+    locator = mdates.AutoDateLocator(interval_multiples=False)
+    ax.xaxis.set_major_locator(locator)
+    ax.xaxis.set_major_formatter(mdates.AutoDateFormatter(locator))
+    ax.yaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(humanize_number))
+    ax.set_title("Reports per day")
+    if (num_days<100):
+        ax.plot(x,y, linestyle='solid', marker='o', markerfacecolor='blue')
+    else:
+        ax.plot(x,y, linestyle='solid', marker='')
+    ax.plot(dd, p(xx),"b--")
+    ax.set_ybound(lower=0)
+    fig.autofmt_xdate()
+    fig.savefig(os.path.join(config.graph_dir, 'history.svg'))
+    fig.clf()
+    plt.close(fig)
+
 def make_contrib_graph(txn):
     # Number of reporters over days
     txn.execute(database.translate_query("""
@@ -213,18 +274,9 @@ def make_contrib_graph(txn):
     dt_firstday = dt_first.replace(hour=0, minute=0, second=0, microsecond=0)
     firstday = int(dt_firstday.strftime("%s"))
     num_days = ( datetime.datetime.today() - dt_firstday ).days
-    if num_days < 7:
-        interval = 1
-    elif num_days<15:
-        interval = 2
-    elif num_days<42:
-        interval = 7
-    else:
-        interval = num_days / 6
     if num_days == 0:
         return
 
-    # FIXME: doesn't take into account stopped reporters
     txn.execute(database.translate_query("""
         SELECT day, COUNT(*) AS count
         FROM (
@@ -244,9 +296,9 @@ def make_contrib_graph(txn):
     y = [row[1] for row in rows]
     fig = plt.figure()
     ax = fig.gca()
-    ax.xaxis.set_major_formatter(mdates.DateFormatter('%d %b'))
-    #ax.xaxis.set_major_locator(mdates.DayLocator(interval=4))
-    ax.xaxis.set_major_locator(mdates.DayLocator(interval=interval))
+    locator = mdates.AutoDateLocator(interval_multiples=False)
+    ax.xaxis.set_major_locator(locator)
+    ax.xaxis.set_major_formatter(mdates.AutoDateFormatter(locator))
     ax.yaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(humanize_number))
     ax.set_title("Number of contributors")
     if (num_days<100):

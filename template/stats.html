@@ -55,28 +55,36 @@
               </div>
               <div class="col-md-6">
                     <ul id="myTabs" class="nav nav-tabs" role="tablist">
-                        <li class="active" role="presentation">
-                            <a id="hourly-tab" aria-expanded="false" aria-controls="hourly" data-toggle="tab" role="tab" href="#hourly">
+                        <li role="presentation">
+                            <a id="hourly-tab" aria-controls="hourly" data-toggle="tab" role="tab" href="#hourly">
                                 Last day
                             </a>
                         </li>
-                        <li role="presentation">
-                            <a id="monthly-tab" aria-controls="monthly" data-toggle="tab" role="tab" href="#monthly" aria-expanded="true">
+                        <li class="active" role="presentation">
+                            <a id="monthly-tab" aria-controls="monthly" data-toggle="tab" role="tab" href="#monthly">
                                 Last 28 days
                             </a>
                         </li>
                         <li role="presentation">
-                            <a id="contrib-tab" aria-controls="contrib" data-toggle="tab" role="tab" href="#contrib" aria-expanded="true">
+                            <a id="history-tab" aria-controls="history" data-toggle="tab" role="tab" href="#history">
+                                History
+                            </a>
+                        </li>
+                        <li role="presentation">
+                            <a id="contrib-tab" aria-controls="contrib" data-toggle="tab" role="tab" href="#contrib">
                                 Contributors
                             </a>
                         </li>
                     </ul>
                     <div id="myTabContent" class="tab-content">
-                        <div id="hourly" class="tab-pane fade in active" aria-labelledby="hourly-tab" role="tabpanel">
+                        <div id="hourly" class="tab-pane fade" aria-labelledby="hourly-tab" role="tabpanel">
                             <img width="90%" type="image/svg+xml" src="{{ graph_base }}/hourly.svg" />
                         </div>
-                        <div id="monthly" class="tab-pane fade" aria-labelledby="monthly-tab" role="tabpanel">
+                        <div id="monthly" class="tab-pane fade in active" aria-labelledby="monthly-tab" role="tabpanel">
                             <img width="90%" type="image/svg+xml" src="{{ graph_base }}/monthly.svg" />
+                        </div>
+                        <div id="history" class="tab-pane fade" aria-labelledby="history-tab" role="tabpanel">
+                            <img width="90%" type="image/svg+xml" src="{{ graph_base }}/history.svg" />
                         </div>
                         <div id="contrib" class="tab-pane fade" aria-labelledby="contrib-tab" role="tabpanel">
                             <img width="90%" type="image/svg+xml" src="{{ graph_base }}/contrib.svg" />
