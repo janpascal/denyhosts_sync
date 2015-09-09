@@ -15,10 +15,13 @@
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import logging
+import datetime
+
 from twistar.registry import Registry
 from twisted.internet.defer import inlineCallbacks, returnValue
 
 import config
+import stats
 
 def _remove_tables(txn):
     print("Removing all data from database and removing tables")
@@ -26,6 +29,7 @@ def _remove_tables(txn):
     txn.execute("DROP TABLE IF EXISTS crackers")
     txn.execute("DROP TABLE IF EXISTS reports")
     txn.execute("DROP TABLE IF EXISTS legacy")
+    txn.execute("DROP TABLE IF EXISTS history")
 
 def _evolve_database_initial(txn, dbtype):
     if dbtype=="sqlite3":
@@ -105,13 +109,41 @@ def _evolve_database_v6(txn, dbtype):
             ( SELECT cracker_id FROM reports )
         """)
 
+def _evolve_database_v7(txn, dbtype):
+    txn.execute("""CREATE TABLE history (
+        `date` DATE PRIMARY KEY,
+        num_reports INTEGER,
+        num_contributors INTEGER, 
+        num_reported_hosts INTEGER 
+    )""")
+
+    # Find first record in database
+    txn.execute("SELECT MIN(first_report_time) FROM reports")
+    first_time = txn.fetchall()
+    if first_time is not None and len(first_time)>0 and first_time[0][0] is not None:
+        date = datetime.date.fromtimestamp(first_time[0][0])
+    else:
+        date = datetime.date.today()
+
+    print("Start date: {}".format(date))
+
+    last_day = datetime.date.today()
+    print("End date: {}".format(last_day))
+
+    # Not very efficient, but probably not a problem
+    while date < last_day:
+        print("Updating history table for {}".format(date))
+        stats.update_history_txn(txn, date, True)
+        date = date + datetime.timedelta(days = 1)
+
 _evolutions = {
     1: _evolve_database_v1,
     2: _evolve_database_v2,
     3: _evolve_database_v3,
     4: _evolve_database_v4,
     5: _evolve_database_v5,
-    6: _evolve_database_v6
+    6: _evolve_database_v6,
+    7: _evolve_database_v7
 }
 
 _schema_version = len(_evolutions)

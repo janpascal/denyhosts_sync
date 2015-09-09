@@ -117,6 +117,7 @@ def make_daily_graph(txn):
         FROM reports
         WHERE first_report_time > ?
         GROUP BY CAST((first_report_time-?)/3600 AS UNSIGNED INTEGER)
+        ORDER BY first_report_time ASC
         """), (yesterday, yesterday, yesterday))
     rows = txn.fetchall()
     if not rows:
@@ -154,29 +155,24 @@ def make_daily_graph(txn):
 def make_monthly_graph(txn):
     # Calculate start of monthly period: last month on the beginning of the
     # current day
-    now = time.time()
-    dt_now = datetime.datetime.fromtimestamp(now)
-    start_hour = dt_now.hour
-    start_day =  dt_now.day
-    dt_ontheday = dt_now.replace(hour=0, minute=0, second=0, microsecond=0)
-    dt_start = dt_ontheday - datetime.timedelta(weeks=4)
-    yestermonth = int(dt_start.strftime('%s'))
+    today = datetime.date.today()
+    dt_start = today - datetime.timedelta(weeks=4)
 
+    # FIXME this probably fails on sqlite
     txn.execute(database.translate_query("""
-        SELECT CAST((first_report_time-?)/24/3600 AS UNSIGNED INTEGER), count(*)
-        FROM reports
-        WHERE first_report_time > ?
-        GROUP BY CAST((first_report_time-?)/24/3600 AS UNSIGNED INTEGER)
-        """), (yestermonth, yestermonth, yestermonth))
+        SELECT date, num_reports
+        FROM history
+        WHERE date >= ?
+        ORDER BY date ASC
+        """), (dt_start,))
     rows = txn.fetchall()
-    if not rows:
+    if rows is None or len(rows)==0:
         return
 
-    rows = insert_zeroes(rows, 28)
-    #logging.debug("Daily: {}".format(rows))
-
-    x = [dt_start + datetime.timedelta(days=row[0]) for row in rows]
-    y = [row[1] for row in rows]
+    #x = [row[0] for row in rows]
+    #y = [row[1] for row in rows]
+    (x,y) = zip(*rows)
+    logging.debug("x: {} ({})".format(x, x[0].__class__))
 
     # calc the trendline
     x_num = mdates.date2num(x)
@@ -204,34 +200,35 @@ def make_monthly_graph(txn):
 def make_history_graph(txn):
     # Graph since first record
     txn.execute(database.translate_query("""
-        SELECT MIN(first_report_time) FROM reports
+        SELECT date FROM history 
+        ORDER BY date ASC
+        LIMIT 1
         """))
     first_time = txn.fetchall()
     if first_time is not None and len(first_time)>0 and first_time[0][0] is not None:
-        dt_first = datetime.datetime.fromtimestamp(first_time[0][0])
+        logging.debug("first_time database query result: {} ({})".format(first_time, first_time[0][0].__class__))
+        dt_first = first_time[0][0]
     else:
-        dt_first= datetime.datetime.today()
-    dt_firstday = dt_first.replace(hour=0, minute=0, second=0, microsecond=0)
-    firstday = int(dt_firstday.strftime("%s"))
-    num_days = ( datetime.datetime.today() - dt_firstday ).days
-    logging.debug("First day in data set: {}".format(dt_firstday))
+        dt_first= datetime.date.today()
+    num_days = ( datetime.date.today() - dt_first ).days
+    logging.debug("First day in data set: {}".format(dt_first))
     logging.debug("Number of days in data set: {}".format(num_days))
     if num_days == 0:
         return
 
+    # FIXME this probably fails on sqlite
     txn.execute(database.translate_query("""
-        SELECT CAST((first_report_time-?)/24/3600 AS UNSIGNED INTEGER) AS `day`, count(*)
-        FROM reports
-        GROUP BY `day`
-        """), (firstday,))
+        SELECT date, num_reports
+        FROM history
+        ORDER BY date ASC
+        """))
     rows = txn.fetchall()
-    if not rows:
+    if rows is None or len(rows)==0:
         return
 
-    rows = insert_zeroes(rows, num_days)
-
-    x = [dt_firstday + datetime.timedelta(days=row[0]) for row in rows]
-    y = [row[1] for row in rows]
+    #x = [dt_firstday + datetime.timedelta(days=row[0]) for row in rows]
+    #y = [row[1] for row in rows]
+    (x,y) = zip(*rows)
 
     # calc the trendline
     x_num = mdates.date2num(x)
@@ -264,36 +261,31 @@ def make_history_graph(txn):
 def make_contrib_graph(txn):
     # Number of reporters over days
     txn.execute(database.translate_query("""
-        SELECT MIN(first_report_time) FROM reports
+        SELECT date FROM history 
+        ORDER BY date ASC
+        LIMIT 1
         """))
     first_time = txn.fetchall()
     if first_time is not None and len(first_time)>0 and first_time[0][0] is not None:
-        dt_first = datetime.datetime.fromtimestamp(first_time[0][0])
+        logging.debug("first_time database query result: {} ({})".format(first_time, first_time[0][0].__class__))
+        dt_first = first_time[0][0]
     else:
-        dt_first= datetime.datetime.today()
-    dt_firstday = dt_first.replace(hour=0, minute=0, second=0, microsecond=0)
-    firstday = int(dt_firstday.strftime("%s"))
-    num_days = ( datetime.datetime.today() - dt_firstday ).days
+        dt_first= datetime.date.today()
+    num_days = ( datetime.date.today() - dt_first ).days
     if num_days == 0:
         return
 
     txn.execute(database.translate_query("""
-        SELECT day, COUNT(*) AS count
-        FROM (
-            SELECT CAST((first_report_time-?)/24/3600 AS UNSIGNED INTEGER) AS `day`, `ip_address`
-            FROM reports 
-            GROUP BY `day`, `ip_address`
-            ) AS series 
-       GROUP BY day 
-       ORDER BY day ASC
-        """), (firstday,))
+        SELECT date, num_contributors
+        FROM history
+        ORDER BY date ASC
+        """))
     rows = txn.fetchall()
-    if rows is None:
+    if rows is None or len(rows)==0:
         return
-    rows = insert_zeroes(rows, num_days)
 
-    x = [dt_firstday + datetime.timedelta(days=row[0]) for row in rows]
-    y = [row[1] for row in rows]
+    (x,y) = zip(*rows)
+
     fig = plt.figure()
     ax = fig.gca()
     locator = mdates.AutoDateLocator(interval_multiples=False)
@@ -324,6 +316,10 @@ def update_stats_cache():
     _stats_busy = True
 
     logging.debug("Updating statistics cache...")
+
+    # Fill history table for yesterday, when necessary
+    yield update_history(None, False)
+
     now = time.time()
     stats = {}
     stats["last_updated"] = now
@@ -395,5 +391,65 @@ def render_stats():
     except Exception, e:
         log.err(_why="Error rendering statistics page: {}".format(e))
         logging.warning("Error creating statistics page: {}".format(e))
+
+def update_history_txn(txn, date, overwrite):
+    """date should be a datetime.date or None, indicating yesterday. 
+    overwrite whould be True when the data should be overwritten when it exists"""
+    try:
+        if date is None:
+            date = datetime.date.today() - datetime.timedelta(days = 1)
+
+        txn.execute(database.translate_query("SELECT 1 FROM history WHERE date=?"), (date,)) 
+        rows = txn.fetchall()
+        date_exists = rows is not None and len(rows)>0
+        logging.debug("Date {} exists in history table: {}".format(date, date_exists))
+
+        if date_exists and not overwrite:
+            return
+
+        logging.info("Updating history table for {}".format(date))
+        start = time.mktime(date.timetuple())
+        end = start + 24*60*60
+        #logging.debug("Date start, end: {}, {}".format(start, end))
+
+        txn.execute(database.translate_query("""
+                SELECT  COUNT(*), 
+                        COUNT(DISTINCT cracker_id),
+                        COUNT(DISTINCT ip_address) 
+                FROM reports 
+                WHERE (first_report_time>=? AND first_report_time<?) OR
+                      (latest_report_time>=? AND latest_report_time<?)
+                """), (start, end, start, end))
+        rows = txn.fetchall()
+        if rows is None or len(rows)==0:
+            return
+
+        num_reports = rows[0][0]
+        num_hosts = rows[0][1]
+        num_reporters = rows[0][2]
+        logging.debug("Number of reporters: {}".format(num_reporters))
+        logging.debug("Number of reports: {}".format(num_reports))
+        logging.debug("Number of reported hosts: {}".format(num_hosts))
+
+        if date_exists and overwrite:
+            txn.execute(database.translate_query("""
+                UPDATE history
+                SET num_reports=?, num_contributors=?, num_reported_hosts=?
+                WHERE date=?
+                """), (num_reports, num_reporters, num_hosts, date))
+        else:
+            txn.execute(database.translate_query("""
+                INSERT INTO history
+                    (date, num_reports, num_contributors, num_reported_hosts)
+                    VALUES (?,?,?,?)
+                """), (date, num_reports, num_reporters, num_hosts))
+    except Exception, e:
+        log.err(_why="Error updating history: {}".format(e))
+        logging.warning("Error updating history: {}".format(e))
+
+def update_history(date, overwrite):
+    "date should be a datetime.date or None, indicating yesterday"
+    return Registry.DBPOOL.runInteraction(update_history_txn, date, overwrite)
+
 
 # vim: tabstop=8 expandtab shiftwidth=4 softtabstop=4

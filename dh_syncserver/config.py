@@ -19,6 +19,7 @@ import inspect
 import logging
 import os.path
 import sys
+import sqlite3
 
 def _get(config, section, option, default=None):
     try:
@@ -79,6 +80,7 @@ def read_config(filename):
     }
     if dbtype=="sqlite3":
         dbparams["check_same_thread"] = False
+        dbparams["detect_types"] = sqlite3.PARSE_DECLTYPES
         dbparams["cp_max"] = 1
         if "database" not in dbparams:
             dbparams["database"] = "/var/lib/dh_syncserver/denyhosts.sqlite"

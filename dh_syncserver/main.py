@@ -75,6 +75,7 @@ def shutdown():
     try:
         site = _xmlrpc_site
         logging.info("shutting down, first closing listening ports...")
+        print("Shutting down, hold on a moment...")
         yield stop_listening()
 
 # This doesn't work, site.session is always empty
