@@ -105,7 +105,9 @@
         <table class="table table-condensed table-striped">
             <tr>
             <th>IP address</th>    
-            <th>Host name</th>    
+            {% if has_hostnames %}
+            <th>Host name</th>
+            {% endif %}
             <th>Country</th>    
             <th>Latest report</th>    
             <th>First report</th>    
@@ -114,7 +116,9 @@
             {% for host in hostlist %}
             <tr>
             <td>{{ host.ip_address }}</td>
+            {% if has_hostnames %}
             <td>{{ host.hostname }}</td>
+            {% endif %}
             <td>{{ host.country }}</td>
             <td>{{ host.latest_time|datetime }}</td>
             <td>{{ host.first_time|datetime }}</td>

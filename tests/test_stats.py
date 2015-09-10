@@ -125,8 +125,6 @@ class StatsTest(base.TestBase):
         self.assertTrue("Number of clients" in html, "HTML should contain number of clients")
         self.assertTrue("../static/graphs/hourly.svg" in html, "HTML should contain path to hourly graph")
         self.assertFalse("127.0.0.1" in html, "HTML should not contain reported ip addresses")
-        # 4 times, since each occurance is repeated in the hostname field 
-        # (reverse DNS is disabled)
-        self.assertEqual(html.count("192.168.1.1"), 4, "HTML should contain ip address of hosts in tables")
+        self.assertEqual(html.count("192.168.1.1"), 2, "HTML should contain ip address of hosts in tables")
 
 # vim: tabstop=8 expandtab shiftwidth=4 softtabstop=4

@@ -100,7 +100,7 @@ def fixup_crackers(hosts):
                 host.hostname = host.ip_address
         except Exception, e:
             logging.debug("Exception looking up reverse DNS for {}: {}".format(host.ip_address, e))
-            host.hostname = host.ip_address
+            host.hostname = "-"
 
 def make_daily_graph(txn):
     # Calculate start of daily period: yesterday on the beginning of the
@@ -206,13 +206,12 @@ def make_history_graph(txn):
         """))
     first_time = txn.fetchall()
     if first_time is not None and len(first_time)>0 and first_time[0][0] is not None:
-        logging.debug("first_time database query result: {} ({})".format(first_time, first_time[0][0].__class__))
         dt_first = first_time[0][0]
     else:
         dt_first= datetime.date.today()
     num_days = ( datetime.date.today() - dt_first ).days
-    logging.debug("First day in data set: {}".format(dt_first))
-    logging.debug("Number of days in data set: {}".format(num_days))
+    #logging.debug("First day in data set: {}".format(dt_first))
+    #logging.debug("Number of days in data set: {}".format(num_days))
     if num_days == 0:
         return
 
@@ -267,7 +266,6 @@ def make_contrib_graph(txn):
         """))
     first_time = txn.fetchall()
     if first_time is not None and len(first_time)>0 and first_time[0][0] is not None:
-        logging.debug("first_time database query result: {} ({})".format(first_time, first_time[0][0].__class__))
         dt_first = first_time[0][0]
     else:
         dt_first= datetime.date.today()
@@ -323,6 +321,7 @@ def update_stats_cache():
     now = time.time()
     stats = {}
     stats["last_updated"] = now
+    stats["has_hostnames"] = config.stats_resolve_hostnames
     # Note paths configured in main.py by the Resource objects
     stats["static_base"] = "../static"
     stats["graph_base"] = "../static/graphs"
