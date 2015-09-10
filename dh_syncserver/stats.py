@@ -158,7 +158,6 @@ def make_monthly_graph(txn):
     today = datetime.date.today()
     dt_start = today - datetime.timedelta(weeks=4)
 
-    # FIXME this probably fails on sqlite
     txn.execute(database.translate_query("""
         SELECT date, num_reports
         FROM history
@@ -169,10 +168,7 @@ def make_monthly_graph(txn):
     if rows is None or len(rows)==0:
         return
 
-    #x = [row[0] for row in rows]
-    #y = [row[1] for row in rows]
     (x,y) = zip(*rows)
-    logging.debug("x: {} ({})".format(x, x[0].__class__))
 
     # calc the trendline
     x_num = mdates.date2num(x)
@@ -215,7 +211,6 @@ def make_history_graph(txn):
     if num_days == 0:
         return
 
-    # FIXME this probably fails on sqlite
     txn.execute(database.translate_query("""
         SELECT date, num_reports
         FROM history
@@ -225,8 +220,6 @@ def make_history_graph(txn):
     if rows is None or len(rows)==0:
         return
 
-    #x = [dt_firstday + datetime.timedelta(days=row[0]) for row in rows]
-    #y = [row[1] for row in rows]
     (x,y) = zip(*rows)
 
     # calc the trendline
