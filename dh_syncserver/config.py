@@ -80,7 +80,7 @@ def read_config(filename):
     }
     if dbtype=="sqlite3":
         dbparams["check_same_thread"] = False
-        dbparams["detect_types"] = sqlite3.PARSE_DECLTYPES
+        dbparams["detect_types"] = sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES
         dbparams["cp_max"] = 1
         if "database" not in dbparams:
             dbparams["database"] = "/var/lib/dh_syncserver/denyhosts.sqlite"

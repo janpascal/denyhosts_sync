@@ -339,9 +339,6 @@ def make_country_bargraph(txn):
     (countries,counts) = zip(*reversed(rows))
     max_count = max(counts)
 
-    logging.debug("Countries: {}".format(countries))
-    logging.debug("Counts: {}".format(counts))
-
     fig = plt.figure()
     ax = fig.add_subplot(111)
 
@@ -499,7 +496,7 @@ def update_recent_history_txn(txn, last_date=None):
 
     try:
         # First find last date for which the history has already been filled
-        txn.execute("SELECT max(date) FROM history") 
+        txn.execute("""SELECT max(date) AS "MAXDATE [DATE]" FROM history""") 
         rows = txn.fetchall()
         if rows is not None and len(rows)>0 and rows[0][0] is not None:
             last_filled_date = rows[0][0]
