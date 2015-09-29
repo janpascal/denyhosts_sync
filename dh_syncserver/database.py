@@ -117,24 +117,10 @@ def _evolve_database_v7(txn, dbtype):
         num_reported_hosts INTEGER 
     )""")
 
-    # Find first record in database
-    txn.execute("SELECT MIN(first_report_time) FROM reports")
-    first_time = txn.fetchall()
-    if first_time is not None and len(first_time)>0 and first_time[0][0] is not None:
-        date = datetime.date.fromtimestamp(first_time[0][0])
-    else:
-        date = datetime.date.today()
+    stats.update_recent_history_txn(txn)
 
-    print("Start date: {}".format(date))
 
-    last_day = datetime.date.today()
-    print("End date: {}".format(last_day))
 
-    # Not very efficient, but probably not a problem
-    while date < last_day:
-        print("Updating history table for {}".format(date))
-        stats.update_history_txn(txn, date, True)
-        date = date + datetime.timedelta(days = 1)
 
 _evolutions = {
     1: _evolve_database_v1,

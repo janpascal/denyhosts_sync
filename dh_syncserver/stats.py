@@ -310,7 +310,7 @@ def update_stats_cache():
     logging.debug("Updating statistics cache...")
 
     # Fill history table for yesterday, when necessary
-    yield update_history(None, False)
+    yield update_recent_history()
 
     now = time.time()
     stats = {}
@@ -385,21 +385,8 @@ def render_stats():
         log.err(_why="Error rendering statistics page: {}".format(e))
         logging.warning("Error creating statistics page: {}".format(e))
 
-def update_history_txn(txn, date, overwrite):
-    """date should be a datetime.date or None, indicating yesterday. 
-    overwrite whould be True when the data should be overwritten when it exists"""
+def update_history_txn(txn, date):
     try:
-        if date is None:
-            date = datetime.date.today() - datetime.timedelta(days = 1)
-
-        txn.execute(database.translate_query("SELECT 1 FROM history WHERE date=?"), (date,)) 
-        rows = txn.fetchall()
-        date_exists = rows is not None and len(rows)>0
-        logging.debug("Date {} exists in history table: {}".format(date, date_exists))
-
-        if date_exists and not overwrite:
-            return
-
         logging.info("Updating history table for {}".format(date))
         start = time.mktime(date.timetuple())
         end = start + 24*60*60
@@ -424,25 +411,77 @@ def update_history_txn(txn, date, overwrite):
         logging.debug("Number of reports: {}".format(num_reports))
         logging.debug("Number of reported hosts: {}".format(num_hosts))
 
-        if date_exists and overwrite:
-            txn.execute(database.translate_query("""
-                UPDATE history
-                SET num_reports=?, num_contributors=?, num_reported_hosts=?
-                WHERE date=?
-                """), (num_reports, num_reporters, num_hosts, date))
-        else:
-            txn.execute(database.translate_query("""
-                INSERT INTO history
-                    (date, num_reports, num_contributors, num_reported_hosts)
-                    VALUES (?,?,?,?)
-                """), (date, num_reports, num_reporters, num_hosts))
+        txn.execute(database.translate_query("""
+            REPLACE INTO history
+                (date, num_reports, num_contributors, num_reported_hosts)
+                VALUES (?,?,?,?)
+            """), (date, num_reports, num_reporters, num_hosts))
     except Exception, e:
         log.err(_why="Error updating history: {}".format(e))
         logging.warning("Error updating history: {}".format(e))
 
-def update_history(date, overwrite):
+def update_recent_history_txn(txn, last_date=None):
     "date should be a datetime.date or None, indicating yesterday"
-    return Registry.DBPOOL.runInteraction(update_history_txn, date, overwrite)
+    if last_date is None:
+        last_date = datetime.date.today() - datetime.timedelta(days = 1)
+
+    try:
+        # First find last date for which the history has already been filled
+        txn.execute("SELECT max(date) FROM history") 
+        rows = txn.fetchall()
+        if rows is not None and len(rows)>0 and rows[0][0] is not None:
+            last_filled_date = rows[0][0]
+        else:
+            txn.execute("SELECT MIN(first_report_time) FROM reports")
+            first_time = txn.fetchall()
+            if first_time is not None and len(first_time)>0 and first_time[0][0] is not None:
+                last_filled_date = datetime.date.fromtimestamp(first_time[0][0])
+            else:
+                last_filled_date = datetime.date.today()
+
+        first_date = last_filled_date + datetime.timedelta(days=1)
+        # Then fill history
+        date = first_date
+        while date <= last_date:
+            update_history_txn(txn, date)
+            date = date + datetime.timedelta(days = 1)
+
+    except Exception as e:
+        log.err(_why="Error updating history: {}".format(e))
+        logging.warning("Error updating history: {}".format(e))
+
+    
+def fixup_history_txn(txn):
+    try:
+        txn.execute("SELECT MIN(first_report_time) FROM reports")
+        first_time = txn.fetchall()
+        if first_time is not None and len(first_time)>0 and first_time[0][0] is not None:
+            first_date = datetime.date.fromtimestamp(first_time[0][0])
+        else:
+            # No data, nothing to do
+            return
+
+        last_date = datetime.date.today() - datetime.timedelta(days = 1)
+
+        # Find any dates for which the history has not been filled
+        txn.execute("SELECT date FROM history ORDER BY date ASC") 
+        rows = txn.fetchall()
+        dates = set([row[0] for row in rows])
+
+        date = first_date
+        while date <= last_date:
+            if date not in dates:
+                update_history_txn(txn, date)
+            date = date + datetime.timedelta(days = 1)
+
+    except Exception as e:
+        log.err(_why="Error fixing up history: {}".format(e))
+        logging.warning("Error fixing up history: {}".format(e))
+
+def update_recent_history(date=None):
+    "date should be a datetime.date or None, indicating yesterday"
+    return Registry.DBPOOL.runInteraction(update_recent_history_txn, date)
+
 
 
 # vim: tabstop=8 expandtab shiftwidth=4 softtabstop=4
