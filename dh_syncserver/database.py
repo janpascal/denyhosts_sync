@@ -20,6 +20,8 @@ import datetime
 from twistar.registry import Registry
 from twisted.internet.defer import inlineCallbacks, returnValue
 
+import GeoIP
+
 import config
 import stats
 
@@ -30,6 +32,7 @@ def _remove_tables(txn):
     txn.execute("DROP TABLE IF EXISTS reports")
     txn.execute("DROP TABLE IF EXISTS legacy")
     txn.execute("DROP TABLE IF EXISTS history")
+    txn.execute("DROP TABLE IF EXISTS country_history")
 
 def _evolve_database_initial(txn, dbtype):
     if dbtype=="sqlite3":
@@ -119,8 +122,20 @@ def _evolve_database_v7(txn, dbtype):
 
     stats.update_recent_history_txn(txn)
 
+def _evolve_database_v8(txn, dbtype):
+    txn.execute("""CREATE TABLE country_history (
+        country_code CHAR(5) PRIMARY KEY,
+        country VARCHAR(50),
+        num_reports INTEGER 
+    )""")
+    txn.execute("CREATE INDEX country_history_count ON country_history(num_reports)")
+    txn.execute('INSERT INTO `info` VALUES ("last_country_history_update", "1900-01-01")')
 
+    print("Calculating per-country totals...")
+    stats.update_country_history_txn(txn, None, include_history=True)
 
+    print("Fixing up historical data...")
+    stats.fixup_history_txn(txn)
 
 _evolutions = {
     1: _evolve_database_v1,
@@ -129,7 +144,8 @@ _evolutions = {
     4: _evolve_database_v4,
     5: _evolve_database_v5,
     6: _evolve_database_v6,
-    7: _evolve_database_v7
+    7: _evolve_database_v7,
+    8: _evolve_database_v8
 }
 
 _schema_version = len(_evolutions)

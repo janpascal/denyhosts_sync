@@ -295,6 +295,76 @@ def make_contrib_graph(txn):
     fig.clf()
     plt.close(fig)
 
+def make_country_piegraph(txn):
+    # Total reports per country
+    limit = 10 # Fixme configurable
+    txn.execute(database.translate_query("""
+        SELECT country, num_reports
+        FROM country_history
+        ORDER BY num_reports DESC
+        LIMIT ?
+        """),(limit,))
+
+    rows = txn.fetchall()
+    if rows is None or len(rows)==0:
+        return
+
+    (labels,sizes) = zip(*rows)
+
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    ax.pie(sizes, labels=labels,
+            autopct='%1.1f%%', shadow=True, startangle=90)
+# Set aspect ratio to be equal so that pie is drawn as a circle.
+    ax.axis('equal')
+
+    fig.savefig(os.path.join(config.graph_dir, 'country_pie.svg'))
+    fig.clf()
+    plt.close(fig)
+
+def make_country_bargraph(txn):
+    # Total reports per country
+    limit = 10 # Fixme configurable
+    txn.execute(database.translate_query("""
+        SELECT country, num_reports
+        FROM country_history
+        ORDER BY num_reports DESC
+        LIMIT ?
+        """),(limit,))
+
+    rows = txn.fetchall()
+    if rows is None or len(rows)==0:
+        return
+
+    (countries,counts) = zip(*reversed(rows))
+    max_count = max(counts)
+
+    logging.debug("Countries: {}".format(countries))
+    logging.debug("Counts: {}".format(counts))
+
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+
+    y_pos = numpy.arange(len(countries))
+    bars = ax.barh(y_pos, counts, align='center', alpha=0.6)
+    count = 0
+    for bar in bars:
+        height = bar.get_height()
+        ax.text(max_count / 20., bar.get_y() + height / 2., 
+            countries[count],
+            ha='left', va='center')
+        count += 1
+    ax.set_yticks(y_pos)
+    ax.set_yticklabels([])
+    ax.set_title('Number of attacks per country of origin (top {})'.format(limit))
+    ax.xaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(humanize_number))
+    ax.set_ylim(ymin=-1)
+    fig.tight_layout()
+
+    fig.savefig(os.path.join(config.graph_dir, 'country_bar.svg'))
+    fig.clf()
+    plt.close(fig)
+
 _cache = None
 _stats_busy = False
 
@@ -311,6 +381,7 @@ def update_stats_cache():
 
     # Fill history table for yesterday, when necessary
     yield update_recent_history()
+    yield update_country_history()
 
     now = time.time()
     stats = {}
@@ -351,6 +422,7 @@ def update_stats_cache():
             yield Registry.DBPOOL.runInteraction(make_monthly_graph)
             yield Registry.DBPOOL.runInteraction(make_contrib_graph)
             yield Registry.DBPOOL.runInteraction(make_history_graph)
+            yield Registry.DBPOOL.runInteraction(make_country_bargraph)
 
         if _cache is None:
             _cache = {}
@@ -482,6 +554,60 @@ def update_recent_history(date=None):
     "date should be a datetime.date or None, indicating yesterday"
     return Registry.DBPOOL.runInteraction(update_recent_history_txn, date)
 
+def update_country_history_txn(txn, date=None, include_history = False):
+    if date is None:
+        date = datetime.date.today() - datetime.timedelta(days = 1)
 
+    if include_history:
+        start_time = 0
+    else:
+        start_time = (date - datetime.date(1970, 1, 1)).total_seconds()
+    end_time = (date + datetime.timedelta(days=1) - datetime.date(1970, 1, 1)).total_seconds()
+
+    txn.execute("SELECT country_code,country,num_reports FROM country_history")
+    rows = txn.fetchall()
+    result = {row[0]:(row[1],row[2]) for row in rows}
+
+    gi = GeoIP.new(GeoIP.GEOIP_MEMORY_CACHE)
+
+    txn.execute(database.translate_query(
+        """SELECT crackers.ip_address,COUNT(*) as count
+        FROM crackers LEFT JOIN reports ON reports.cracker_id = crackers.id
+        WHERE reports.first_report_time >= ? AND reports.first_report_time < ?
+        GROUP BY crackers.id
+        """), (start_time, end_time))
+
+    while True:
+        rows = txn.fetchmany(size=100)
+        if len(rows) == 0:
+            break
+        for row in rows:
+            ip = row[0]
+            count = row[1]
+            try:
+                country_code = gi.country_code_by_addr(ip)
+                country = gi.country_name_by_addr(ip)
+                if country_code is None:
+                    country_code = "ZZ"
+                if country is None:
+                    country = "(Unknown)"
+                if country_code in result:
+                    count += result[country_code][1]
+                result[country_code] = (country,count)
+            except Exception, e:
+                logging.debug("Exception looking up country for {}: {}".format(ip, e))
+     
+    logging.debug("result: ".format(result))
+
+    for country_code in result:
+        country,count = result[country_code]
+        txn.execute(database.translate_query(
+            """REPLACE INTO country_history (country_code,country,num_reports)
+            VALUES (?,?,?)"""),
+            (country_code,country,count))
+
+def update_country_history(date=None, include_history=False):
+    "date should be a datetime.date or None, indicating yesterday"
+    return Registry.DBPOOL.runInteraction(update_country_history_txn, date, include_history)
 
 # vim: tabstop=8 expandtab shiftwidth=4 softtabstop=4
