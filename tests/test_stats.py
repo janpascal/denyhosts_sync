@@ -14,6 +14,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import datetime
 import inspect
 import os
 import os.path
@@ -26,6 +27,8 @@ from dh_syncserver import controllers
 from dh_syncserver import stats
 
 from twisted.internet.defer import inlineCallbacks, returnValue
+
+from twistar.registry import Registry
 
 import base
 
@@ -74,6 +77,9 @@ class StatsTest(base.TestBase):
         yield controllers.add_report_to_cracker(c2, "127.0.0.2", when=now)
         yield controllers.add_report_to_cracker(c2, "127.0.0.3", when=now+1)
 
+        yield Registry.DBPOOL.runInteraction(stats.fixup_history_txn)
+        yesterday = datetime.date.today() - datetime.timedelta(days=1)
+        yield Registry.DBPOOL.runInteraction(stats.update_country_history_txn, yesterday, include_history=True)
         yield stats.update_stats_cache()
 
     @inlineCallbacks
