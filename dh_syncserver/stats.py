@@ -121,7 +121,8 @@ def make_daily_graph(txn):
         """), (yesterday, yesterday, yesterday))
     rows = txn.fetchall()
     if not rows:
-        return
+        logging.debug("No data for past 24 hours")
+        rows = [(0,0)]
     #logging.debug("Daily: {}".format(rows))
     rows = insert_zeroes(rows, 24)
     #logging.debug("Daily: {}".format(rows))
