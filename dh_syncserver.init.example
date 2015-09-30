@@ -53,6 +53,9 @@ case "$1" in
 	$0 stop
 	$0 start
 	;;
+  status)
+        status_of_proc "$DAEMON" $NAME
+        ;;
   reload|force-reload)
 	log_begin_msg "Reloading $DESC: $NAME"
 	start-stop-daemon --stop --signal HUP --pidfile $PIDFILE
