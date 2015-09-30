@@ -42,9 +42,9 @@ of `denyhosts`.
   use `apt-get install python-mysqldb`.
 
 ## Installation
-Run the following command: `sudo ./setup.py install`. This will download the
-needed Python libraries, install the Python scripts onto your system (usually in
-`/usr/local/lib/python2.7/dist-packages`), install the default configuration
+Run the following command: `sudo ./setup.py minify_js minify_css install`. This will download the
+needed Python libraries, minify the used JavaScript and CSS libraries, install the Python scripts 
+onto your system (usually in `/usr/local/lib/python2.7/dist-packages`), install the default configuration
 file in `/etc/dh_syncserver.conf` and the Python script
 `/usr/local/bin/dh_syncserver`.
 
