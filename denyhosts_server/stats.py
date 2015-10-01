@@ -325,6 +325,17 @@ def make_country_piegraph(txn):
 def make_country_bargraph(txn):
     # Total reports per country
     limit = 10 # Fixme configurable
+
+    txn.execute("""
+        SELECT sum(num_reports)
+        FROM country_history
+        """)
+
+    rows = txn.fetchall()
+    if rows is None or len(rows)==0:
+        return
+    total_reports = rows[0][0]
+    
     txn.execute(database.translate_query("""
         SELECT country, num_reports
         FROM country_history
@@ -348,7 +359,7 @@ def make_country_bargraph(txn):
     for bar in bars:
         height = bar.get_height()
         ax.text(max_count / 20., bar.get_y() + height / 2., 
-            countries[count],
+            "{}% {}".format(round(counts[count]/total_reports*100), countries[count] ),
             ha='left', va='center')
         count += 1
     ax.set_yticks(y_pos)
