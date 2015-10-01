@@ -221,15 +221,15 @@ def run_main():
     global main_xmlrpc_handler, stats_resource, web_root, web_static
 
     parser = argparse.ArgumentParser(description="DenyHosts sync server")
-    parser.add_argument("-c", "--config", default="/etc/dh_syncserver.conf", help="Configuration file")
+    parser.add_argument("-c", "--config", default="/etc/denyhosts-server.conf", help="Configuration file")
     parser.add_argument("--recreate-database", action='store_true', help="Wipe and recreate the database")
     parser.add_argument("--evolve-database", action='store_true', help="Evolve the database to the latest schema version")
     parser.add_argument("--purge-legacy-addresses", action='store_true',
-       help="Purge all hosts downloaded from the legacy server. DO NOT USE WHEN DH_SYNCSERVER IS RUNNING!")
+       help="Purge all hosts downloaded from the legacy server. DO NOT USE WHEN DENYHOSTS-SERVER IS RUNNING!")
     parser.add_argument("--purge-reported-addresses", action='store_true',
-        help="Purge all hosts that have been reported by clients. DO NOT USE WHEN DH_SYNCSERVER IS RUNNING!")
+        help="Purge all hosts that have been reported by clients. DO NOT USE WHEN DENYHOSTS-SERVER IS RUNNING!")
     parser.add_argument("--purge-ip", action='store',
-        help="Purge ip address from both legacy and reported host lists. DO NOT USE WHEN DH_SYNCSERVER IS RUNNING!")
+        help="Purge ip address from both legacy and reported host lists. DO NOT USE WHEN DENYHOSTS-SERVER IS RUNNING!")
     parser.add_argument("-f", "--force", action='store_true',
         help="Do not ask for confirmation, execute action immediately")
     args = parser.parse_args()
@@ -240,7 +240,7 @@ def run_main():
         config.read_config(args.config)
     except ConfigParser.NoSectionError, e:
         print("Error in reading the configuration file from \"{}\": {}.".format(args.config, e))
-        print("Please review the configuration file. Look at the supplied dh_syncserver.conf.example for more information.")
+        print("Please review the configuration file. Look at the supplied denyhosts-server.conf.example for more information.")
         sys.exit()
 
     configure_logging()
@@ -256,7 +256,7 @@ def run_main():
         or args.purge_reported_addresses
         or args.recreate_database
         or args.purge_ip is not None):
-        print("WARNING: do not run this method when dh_syncserver is running.")
+        print("WARNING: do not run this method when denyhosts-server is running.")
         reply = raw_input("Are you sure you want to continue (Y/N): ")
         if not reply.upper().startswith('Y'):
             sys.exit()
@@ -292,7 +292,7 @@ def run_main():
         schedule_jobs()
 
     # Start reactor
-    logging.info("Starting dh_syncserver version {}".format(__init__.version))
+    logging.info("Starting denyhosts-server version {}".format(__init__.version))
     reactor.run()
 
 # vim: tabstop=8 expandtab shiftwidth=4 softtabstop=4

@@ -4,10 +4,10 @@ After=syslog.target
 
 [Service]
 Type=simple
-User=dh_syncserver
-Group=dh_syncserver
-EnvironmentFile=-/etc/default/dh_syncserver
-ExecStart=/usr/local/bin/dh_syncserver -c /etc/dh_syncserver.conf
+User=denyhosts-server
+Group=denyhosts-server
+EnvironmentFile=-/etc/default/denyhosts-server
+ExecStart=/usr/local/bin/denyhosts-server -c /etc/denyhosts-server.conf
 ExecReload=/bin/kill -HUP $MAINPID
 Restart=on-failure
 StandardOutput=syslog

@@ -16,10 +16,10 @@
 
 import time
 
-from dh_syncserver import models
-from dh_syncserver import controllers 
-from dh_syncserver import database
-from dh_syncserver.models import Cracker, Report
+from denyhosts_server import models
+from denyhosts_server import controllers 
+from denyhosts_server import database
+from denyhosts_server.models import Cracker, Report
 
 from twisted.internet.defer import inlineCallbacks, returnValue
 

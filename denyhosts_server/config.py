@@ -83,7 +83,7 @@ def read_config(filename):
         dbparams["detect_types"] = sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES
         dbparams["cp_max"] = 1
         if "database" not in dbparams:
-            dbparams["database"] = "/var/lib/dh_syncserver/denyhosts.sqlite"
+            dbparams["database"] = "/var/lib/denyhosts-server/denyhosts.sqlite"
     elif dbtype=="MySQLdb":
         dbparams["cp_reconnect"] = True
 
@@ -110,7 +110,7 @@ def read_config(filename):
     legacy_threshold = _getint(_config, "sync", "legacy_threshold", 10)
     legacy_resiliency = _getint(_config, "sync", "legacy_resiliency", 10800)
 
-    logfile = _get(_config, "logging", "logfile", "/var/log/dh_syncserver/dh_syncserver.log")
+    logfile = _get(_config, "logging", "logfile", "/var/log/denyhosts-server/denyhosts-server.log")
     loglevel = _get(_config, "logging", "loglevel", "INFO")
     try:
         loglevel = int(loglevel)

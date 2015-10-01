@@ -21,10 +21,10 @@ import os.path
 import time
 import traceback
 
-from dh_syncserver.models import Cracker, Report, Legacy
-from dh_syncserver import config
-from dh_syncserver import controllers
-from dh_syncserver import stats
+from denyhosts_server.models import Cracker, Report, Legacy
+from denyhosts_server import config
+from denyhosts_server import controllers
+from denyhosts_server import stats
 
 from twisted.internet.defer import inlineCallbacks, returnValue
 

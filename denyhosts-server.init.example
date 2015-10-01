@@ -1,7 +1,7 @@
 #! /bin/sh
 #
 ### BEGIN INIT INFO
-# Provides:          dh_syncserver
+# Provides:          denyhosts-server
 # Required-Start:    $syslog $network $remote_fs
 # Required-Stop:     $syslog $network $remote_fs
 # Should-Start:      mysql
@@ -14,19 +14,19 @@
 ### END INIT INFO
 
 PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
-DAEMON=/usr/local/bin/dh_syncserver
+DAEMON=/usr/local/bin/denyhosts-server
 DESC="DenyHosts sync server"
 NAME=`basename $DAEMON`
 PIDFILE=/var/run/$NAME.pid
-DAEMONUSER=dh_syncserver
-CONFIG_FILE=/etc/dh_syncserver.conf
+DAEMONUSER=denyhosts-server
+CONFIG_FILE=/etc/denyhosts-server.conf
 QUIET=--quiet
 
 test -x $DAEMON || exit 0
 
 # Include defaults if available
-if [ -f /etc/default/dh_syncserver ] ; then
-	. /etc/default/dh_syncserver
+if [ -f /etc/default/denyhosts-server ] ; then
+	. /etc/default/denyhosts-server
 fi
 DAEMON_ARGS="-c $CONFIG_FILE"
 
@@ -39,14 +39,14 @@ case "$1" in
 	log_begin_msg "Starting $DESC: $NAME"
         start-stop-daemon --start $QUIET --chuid $DAEMONUSER \
                 --make-pidfile --pidfile $PIDFILE --background \
-                --startas /bin/bash -- -c "exec $DAEMON $DAEMON_ARGS >> /var/log/dh_syncserver/console.log 2>&1"
+                --startas /bin/bash -- -c "exec $DAEMON $DAEMON_ARGS >> /var/log/denyhosts-server/console.log 2>&1"
 	log_end_msg $?
 	;;
   stop)
 	log_begin_msg "Stopping $DESC: $NAME"
         start-stop-daemon --stop $QUIET --chuid $DAEMONUSER \
                 --pidfile $PIDFILE \
-                --startas /bin/bash -- -c "exec $DAEMON $DAEMON_ARGS >> /var/log/dh_syncserver/console.log 2>&1"
+                --startas /bin/bash -- -c "exec $DAEMON $DAEMON_ARGS >> /var/log/denyhosts-server/console.log 2>&1"
 	log_end_msg $?
 	;;
   restart)

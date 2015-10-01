@@ -1,14 +1,14 @@
-.TH dh_syncserver 1 "Fri Juli 24 23:51:12 CEST 2015"
+.TH denyhosts-server 1 "Fri Juli 24 23:51:12 CEST 2015"
 .SH NAME
-.B dh_syncserver
+.B denyhosts-server
 - service to share blocked addresses from denyhosts.
 .SH SYNOPSIS
-.B dh_syncserver [-h] [-c CONFIG] [--recreate-database]
+.B denyhosts-server [-h] [-c CONFIG] [--recreate-database]
 .B   [--evolve-database] [--purge-legacy-addresses]
 .B   [--purge-reported-addresses] [--purge-ip IP_ADDRESS] [-f]
 .SH DESCRIPTION
 .PP
-dh_syncserver is a server that allows denyhosts clients to share blocked IP
+denyhosts-server is a server that allows denyhosts clients to share blocked IP
 addresses. It is intended to be a drop-in replacement for the service at
 xmlrpc.denyhosts.net that up to now has been provided by the original author
 of denyhosts.

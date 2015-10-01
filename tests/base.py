@@ -3,10 +3,10 @@ import inspect
 import os
 import os.path
 
-from dh_syncserver import config
-from dh_syncserver import models
-from dh_syncserver import main
-from dh_syncserver import database
+from denyhosts_server import config
+from denyhosts_server import models
+from denyhosts_server import main
+from denyhosts_server import database
 
 from twisted.trial import unittest
 from twisted.enterprise import adbapi

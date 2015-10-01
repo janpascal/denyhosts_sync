@@ -31,8 +31,8 @@
 # Default: sqlite3
 #type: sqlite3
 
-# Database name. Default: /var/lib/dh_syncserver/denyhosts.sqlite
-#database: /var/lib/dh_syncserver/denyhosts.sqlite
+# Database name. Default: /var/lib/denyhosts-server/denyhosts.sqlite
+#database: /var/lib/denyhosts-server/denyhosts.sqlite
 
 # Maximum size of database connection pool. Default: 5
 # For high volume servers, set this to 100 or so.
@@ -80,8 +80,8 @@
 #legacy_expiry_days: 30
 
 [logging]
-# Location of the log file. Default: /var/log/dh_syncserver/dh_syncserver.log
-#logfile: /var/log/dh_syncserver/dh_syncserver.log
+# Location of the log file. Default: /var/log/denyhosts-server/denyhosts-server.log
+#logfile: /var/log/denyhosts-server/denyhosts-server.log
 
 # Log level. One of CRITICAL, ERROR, WARNING, INFO of DEBUG
 # Default: INFO. Set to WARNING for high-volume server

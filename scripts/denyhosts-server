@@ -17,9 +17,9 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-import dh_syncserver.main
+import denyhosts_server.main
 
 if __name__ == '__main__':
-    dh_syncserver.main.run_main()
+    denyhosts_server.main.run_main()
 
 # vim: tabstop=8 expandtab shiftwidth=4 softtabstop=4

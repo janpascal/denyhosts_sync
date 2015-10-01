@@ -1,6 +1,19 @@
-Release 1.x.x
+Release 2.0.0 (2015-10-01)
+- Renamed to denyhosts-server to avoid confusion with Debian dh_* commands
+
+Release 1.4.1 (2015-10-01)
+- Add status command to init script
+- Add Description header to initscript
+- Remove ancient IE compatibility cruft
+- Put un-minified js and css in package source, minify using
+  python setup.py minify_js minify_css
+
+Release 1.4.0 (2015-09-19)
 - Add historical statistics that survive a database purge, using
   the 'history' table
+- Add graph showing the distribution of attacks over countries of origin
+- Several small fixes
+- Remove hostname column from stats when reverse dns lookup is disabled
 
 Release 1.3.0 (2015-09-08)
 - Improve performance, removed some blocking code from the statistics update

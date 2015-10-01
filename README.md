@@ -1,6 +1,6 @@
-# README for dh_syncserver
+# README for denyhosts-server
 
-`dh_syncserver` is a server that allows `denyhosts` clients to share blocked IP
+`denyhosts-server` is a server that allows `denyhosts` clients to share blocked IP
 addresses. It is intended to be a drop-in replacement for the service at
 `xmlrpc.denyhosts.net` that up to now has been provided by the original author
 of `denyhosts`.
@@ -31,7 +31,7 @@ of `denyhosts`.
   include_dirs=/usr/local/include
   library_dirs=/usr/local/lib
   ```
-- `dh_syncserver` is developed and tested on a Debian GNU/Linux system. It should
+- `denyhosts-server` is developed and tested on a Debian GNU/Linux system. It should
   work on any Linux system with Python. Microsoft Windows is not a supported
   platform, although it should work without major modifications.
 - On most installations the sqlite3 Python library comes with Python 2.7. If
@@ -45,22 +45,22 @@ of `denyhosts`.
 Run the following command: `sudo ./setup.py minify_js minify_css install`. This will download the
 needed Python libraries, minify the used JavaScript and CSS libraries, install the Python scripts 
 onto your system (usually in `/usr/local/lib/python2.7/dist-packages`), install the default configuration
-file in `/etc/dh_syncserver.conf` and the Python script
-`/usr/local/bin/dh_syncserver`.
+file in `/etc/denyhosts-server.conf` and the Python script
+`/usr/local/bin/denyhosts-server`.
 
 ## Configuration
 Create the database and a database user with full rights to it. Copy the
-`dh_syncserver.conf.example` file to `/etc/dh_syncserver.conf` and edit it.
+`denyhosts-server.conf.example` file to `/etc/denyhosts-server.conf` and edit it.
 Fill in the database parameters, the location of the log file (which should be
-writable by the system user that will be running dh_syncserver) and
+writable by the system user that will be running denyhosts-server) and
 other settings you wish to change. `graph_dir` in the `stats` sections is
-another location that should be writable by `dh_syncserver`.
+another location that should be writable by `denyhosts-server`.
 
-Prepare the database for first use with the command `dh_syncserver
---recreate-database`. This will create the tables needed by dh_syncserver.
+Prepare the database for first use with the command `denyhosts-server
+--recreate-database`. This will create the tables needed by denyhosts-server.
 
-## Running dh_syncserver
-Simply run `dh_syncserver`. Unless there are unexpected errors, this will give no
+## Running denyhosts-server
+Simply run `denyhosts-server`. Unless there are unexpected errors, this will give no
 output and the server will just keep running. Configure your DenyHosts clients
 to use the new synchronisation server by setting
 ```
@@ -75,17 +75,17 @@ numbers are configurable. The statistics page can be on the same port as
 the RPC server, or on another.
 
 ## Signals
-When `dh_syncserver` receives the `SIGHUP` signal, it will re-read the
+When `denyhosts-server` receives the `SIGHUP` signal, it will re-read the
 configuration file. Changes to the database configuration are ignored.
 
 ## Updates
-Installing the new version of `dh_syncserver` with `./setup.py install`.
-Edit the configuration file at `/etc/dh_syncserver.conf` to configure any new
+Installing the new version of `denyhosts-server` with `./setup.py install`.
+Edit the configuration file at `/etc/denyhosts-server.conf` to configure any new
 feature added since the last release. Check `changelog.txt` for new
 configuration items.
 
-Stop dh_syncserver, update the database tables by running `dh_syncserver --evolve-database` and
-restart dh_syncserver.
+Stop denyhosts-server, update the database tables by running `denyhosts-server --evolve-database` and
+restart denyhosts-server.
 
 ## Maintenance
 Old reports will be automatically purged by the configurable maintenance job.
@@ -96,19 +96,19 @@ reports retrieved from the legacy sync server, use the
 from both the reported and the legacy host lists, use the `--purge-ip` command
 line option.
 
-Note: Use these options with care. Do not use them while `dh_syncserver` is
+Note: Use these options with care. Do not use them while `denyhosts-server` is
 running, since this may cause database inconsistencies. Use the `--force`
 command line options to skip the safety prompt when using the purge options.
 
 ## Links
-- [`dh_syncserver` project site](https://github.com/janpascal/denyhosts_sync)
+- [`denyhosts-server` project site](https://github.com/janpascal/denyhosts_sync)
 - [`denyhosts` project site](https://github.com/denyhosts/denyhosts)
 - [Information on synchronisation algorithm](https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=622697)
 - [Original, seemingly abandoned `DenyHosts` project](http://www.denyhosts.net)
 
 ## Copyright and license
 
-### dh_syncserver
+### denyhosts-server
 Copyright (C) 2015 Jan-Pascal van Best <janpascal@vanbest.org>
 
 This program is free software: you can redistribute it and/or modify
@@ -125,7 +125,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 ### Synchronisation algorithm
-The synchronisation algorithm implemented in dh_syncserver is based
+The synchronisation algorithm implemented in denyhosts-server is based
 on an article by Anne Bezemer, published as Debian bug#622697 and
 archived at [Debian bug#622697](https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=622697)
 The article is Copyright (C) 2011 J.A. Bezemer <j.a.bezemer@opensourcepartners.nl>

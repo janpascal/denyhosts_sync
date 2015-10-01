@@ -2,19 +2,19 @@
 
 from setuptools import setup
 from glob import glob
-from dh_syncserver import version
+from denyhosts_server import version
 
 etcpath = "/etc"
 
-setup(name='dh_syncserver',
+setup(name='denyhosts-server',
       version=version,
       description='DenyHosts Synchronisation Server',
       author='Jan-Pascal van Best',
       author_email='janpascal@vanbest.org',
       url='http://www.github.com/janpascal/denyhosts_sync_server',
-      packages=['dh_syncserver'],
+      packages=['denyhosts_server'],
       install_requires=["Twisted", "twistar", "ipaddr", "jinja2", "numpy", "matplotlib", "GeoIP", "minify"],
-      scripts=['scripts/dh_syncserver'],
+      scripts=['scripts/denyhosts-server'],
       data_files=[
         ('static/js', glob('static/js/*.min.js')),
         ('static/css', glob('static/css/*.min.css')),
@@ -24,9 +24,9 @@ setup(name='dh_syncserver',
                     'README.md', 
                     'LICENSE.md', 
                     'changelog.txt', 
-                    'dh_syncserver.conf.example',
-                    'dh_syncserver.service.example', 
-                    'dh_syncserver.init.example' 
+                    'denyhosts-server.conf.example',
+                    'denyhosts-server.service.example', 
+                    'denyhosts-server.init.example' 
                 ]
         ),
       ],
