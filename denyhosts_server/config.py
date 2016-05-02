@@ -17,6 +17,7 @@
 import ConfigParser
 import inspect
 import logging
+import os
 import os.path
 import sys
 import sqlite3
@@ -122,8 +123,12 @@ def read_config(filename):
             loglevel = logging.INFO
 
     stats_frequency = _getint(_config, "stats", "update_frequency", 600)
-    package_dir =  os.path.dirname(os.path.dirname(inspect.getsourcefile(read_config)))
-    static_dir = _get(_config, "stats", "static_dir", 
+    # By default - static files placed in process working directory
+    package_dir = os.getcwd()
+    if not os.path.exists( os.path.join( package_dir, "static" ) ):
+        # If not - use developer or inplace working path
+        package_dir =  os.path.dirname(os.path.dirname(inspect.getsourcefile(read_config)))
+    static_dir = _get(_config, "stats", "static_dir",
         os.path.join( 
             package_dir,
             "static"))
