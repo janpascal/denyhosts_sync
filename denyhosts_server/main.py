@@ -162,8 +162,8 @@ def start_listening():
 
     # /static
     stats_root.putChild('static', web_static)
-    # /static/graphs
-    web_static.putChild('graphs', web_graphs)
+    # /static/graph
+    web_static.putChild('graph', web_graphs)
 
     logging.info("Start listening on port {}".format(config.xmlrpc_listen_port))
     _xmlrpc_site = server.Site(xmlrpc_root)
