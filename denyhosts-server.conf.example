@@ -43,6 +43,9 @@
 # denyhosts clients per sync. Default: 50
 #max_reported_crackers: 50
 
+# TCP addr to listen on. Default: empty (all)
+#listen_host:
+
 # TCP port to listen on. Default: 9911
 #listen_port: 9911
 
@@ -109,6 +112,10 @@
 # Whether to resolve hostnames for the IP addresses in the statistics
 # Default: yes
 #resolve_hostnames: yes
+
+# TCP addr to serve statistics. Can be the same a the listen_host in the
+# [sync] section. Default: empty (all)
+#listen_host:
 
 # TCP port to serve statistics. Can be the same a the listen_port in the
 # [sync] section. Default: 9911
