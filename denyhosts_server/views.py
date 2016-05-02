@@ -54,13 +54,16 @@ class Server(xmlrpc.XMLRPC):
     @inlineCallbacks
     def xmlrpc_add_hosts(self, request, hosts):
         try:
-            logging.info("add_hosts({}) from {}".format(hosts, request.getClientIP()))
+            x_real_ip = request.received_headers.get("X-Real-IP")
+            remote_ip = x_real_ip or request.getClientIP()
+
+            logging.info("add_hosts({}) from {}".format(hosts, remote_ip))
             for cracker_ip in hosts:
                 if not self.is_valid_ip_address(cracker_ip):
-                    logging.warning("Illegal host ip address {} from {}".format(cracker_ip, request.getClientIP()))
+                    logging.warning("Illegal host ip address {} from {}".format(cracker_ip, remote_ip))
                     raise xmlrpc.Fault(101, "Illegal IP address \"{}\".".format(cracker_ip))
 
-                logging.debug("Adding report for {} from {}".format(cracker_ip, request.getClientIP()))
+                logging.debug("Adding report for {} from {}".format(cracker_ip, remote_ip))
                 yield utils.wait_and_lock_host(cracker_ip)
                 try:
                     cracker = yield Cracker.find(where=['ip_address=?', cracker_ip], limit=1)
@@ -69,10 +72,10 @@ class Server(xmlrpc.XMLRPC):
                         cracker = Cracker(ip_address=cracker_ip, first_time=now,
                             latest_time=now, resiliency=0, total_reports=0, current_reports=0)
                         yield cracker.save()
-                    yield controllers.add_report_to_cracker(cracker, request.getClientIP())
+                    yield controllers.add_report_to_cracker(cracker, remote_ip)
                 finally:
                     utils.unlock_host(cracker_ip)
-                logging.debug("Done adding report for {} from {}".format(cracker_ip,request.getClientIP()))
+                logging.debug("Done adding report for {} from {}".format(cracker_ip,remote_ip))
         except xmlrpc.Fault, e:
             raise e
         except Exception, e:
@@ -85,20 +88,23 @@ class Server(xmlrpc.XMLRPC):
     @inlineCallbacks
     def xmlrpc_get_new_hosts(self, request, timestamp, threshold, hosts_added, resiliency):
         try:
+            x_real_ip = request.received_headers.get("X-Real-IP")
+            remote_ip = x_real_ip or request.getClientIP()
+
             logging.debug("get_new_hosts({},{},{},{}) from {}".format(timestamp, threshold, 
-                hosts_added, resiliency, request.getClientIP()))
+                hosts_added, resiliency, remote_ip))
             try:
                 timestamp = long(timestamp)
                 threshold = int(threshold)
                 resiliency = long(resiliency)
             except:
-                logging.warning("Illegal arguments to get_new_hosts from client {}".format(request.getClientIP()))
+                logging.warning("Illegal arguments to get_new_hosts from client {}".format(remote_ip))
                 raise xmlrpc.Fault(102, "Illegal parameters.")
 
             now = time.time()
             # refuse timestamps from the future
             if timestamp > now:
-                logging.warning("Illegal timestamp to get_new_hosts from client {}".format(request.getClientIP()))
+                logging.warning("Illegal timestamp to get_new_hosts from client {}".format(remote_ip))
                 raise xmlrpc.Fault(103, "Illegal timestamp.")
 
             for host in hosts_added:
