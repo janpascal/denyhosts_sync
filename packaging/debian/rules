@@ -1,0 +1,21 @@
+#!/usr/bin/make -f
+# -*- makefile -*-
+#
+
+DESTDIR := $(CURDIR)/debian/denyhosts-server
+
+%:
+	dh --with python2 $@
+
+override_dh_auto_install:
+	python setup.py minify_css minify_js install --no-compile -O0 --force \
+	  --root=$(DESTDIR) \
+	  --install-scripts=usr/sbin
+
+override_dh_clean:
+	rm -fv static/*/*.min.*
+	rm -fr *.egg-info
+	dh_clean
+
+override_dh_installchangelogs:
+	dh_installchangelogs changelog.txt

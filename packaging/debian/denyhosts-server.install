@@ -1,0 +1,4 @@
+static/css/*.min.* /var/lib/denyhosts-server/static/css
+static/js/*.min.* /var/lib/denyhosts-server/static/js
+template /var/lib/denyhosts-server/
+debian/etc/* etc/

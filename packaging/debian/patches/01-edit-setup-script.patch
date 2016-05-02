@@ -1,0 +1,42 @@
+--- a/setup.py
++++ b/setup.py
+@@ -11,24 +11,24 @@
+       description='DenyHosts Synchronisation Server',
+       author='Jan-Pascal van Best',
+       author_email='janpascal@vanbest.org',
+-      url='http://www.github.com/janpascal/denyhosts_sync_server',
++      url='https://github.com/janpascal/denyhosts_sync',
+       packages=['denyhosts_server'],
+-      install_requires=["Twisted", "twistar", "ipaddr", "jinja2", "numpy", "matplotlib", "GeoIP", "minify"],
++#      install_requires=["Twisted", "twistar", "ipaddr", "jinja2", "numpy", "matplotlib", "GeoIP", "minify"],
+       scripts=['scripts/denyhosts-server'],
+       data_files=[
+-        ('static/js', glob('static/js/*.min.js')),
+-        ('static/css', glob('static/css/*.min.css')),
+-        ('static/graph', glob('static/graph/README')),
+-        ('template', glob('template/*')),
+-        ('docs', [
+-                    'README.md', 
+-                    'LICENSE.md', 
+-                    'changelog.txt', 
+-                    'denyhosts-server.conf.example',
+-                    'denyhosts-server.service.example', 
+-                    'denyhosts-server.init.example' 
+-                ]
+-        ),
++#        ('static/js', glob('static/js/*.min.js')),
++#        ('static/css', glob('static/css/*.min.css')),
++#        ('static/graph', glob('static/graph/README')),
++#        ('template', glob('template/*')),
++#        ('docs', [
++#                    'README.md', 
++#                    'LICENSE.md', 
++#                    'changelog.txt', 
++#                    'denyhosts-server.conf.example',
++#                    'denyhosts-server.service.example', 
++#                    'denyhosts-server.init.example' 
++#                ]
++#        ),
+       ],
+       license="""
+ Copyright (C) 2015 Jan-Pascal van Best <janpascal@vanbest.org>

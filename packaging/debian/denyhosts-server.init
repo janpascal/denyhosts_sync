@@ -1,0 +1,75 @@
+#! /bin/sh
+#
+### BEGIN INIT INFO
+# Provides:          denyhosts-server
+# Required-Start:    $syslog $network $remote_fs
+# Required-Stop:     $syslog $network $remote_fs
+# Should-Start:      mysql
+# Should-Stop:       mysql
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: DenyHosts synchronisation service
+# Description:       Service that allows DenyHosts clients to share blocked IP
+#                    addresses.
+### END INIT INFO
+
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+DAEMON=/usr/sbin/denyhosts-server
+DESC="DenyHosts sync server"
+NAME=`basename $DAEMON`
+PIDFILE=/var/run/$NAME.pid
+DAEMONUSER=denyhosts-server
+DAEMONGROUP=denyhosts
+WORKDIR=/var/lib/denyhosts-server
+CONFIG_FILE=/etc/denyhosts-server.conf
+QUIET=--quiet
+
+test -x $DAEMON || exit 0
+
+# Include defaults if available
+if [ -f /etc/default/denyhosts-server ] ; then
+	. /etc/default/denyhosts-server
+fi
+DAEMON_ARGS="-c $CONFIG_FILE"
+
+#set -e
+
+. /lib/lsb/init-functions
+
+case "$1" in
+  start)
+	log_begin_msg "Starting $DESC: $NAME"
+        start-stop-daemon --start $QUIET --chuid $DAEMONUSER:$DAEMONGROUP \
+                --chdir $WORKDIR \
+                --make-pidfile --pidfile $PIDFILE --background \
+                --startas $DAEMON -- $DAEMON_ARGS
+	log_end_msg $?
+	;;
+  stop)
+	log_begin_msg "Stopping $DESC: $NAME"
+        start-stop-daemon --stop $QUIET --retry=TERM/30/KILL/5 --chuid $DAEMONUSER:$DAEMONGROUP \
+                --chdir $WORKDIR \
+                --pidfile $PIDFILE \
+                --startas $DAEMON -- $DAEMON_ARGS
+	log_end_msg $?
+	;;
+  restart)
+	$0 stop
+	$0 start
+	;;
+  status)
+        status_of_proc "$DAEMON" $NAME
+        ;;
+  reload|force-reload)
+	log_begin_msg "Reloading $DESC: $NAME"
+	start-stop-daemon --stop --signal HUP --pidfile $PIDFILE
+	log_end_msg $?
+	;;
+  *)
+	N=/etc/init.d/$NAME
+	echo "Usage: $N {start|stop|restart|reload|force-reload}" >&2
+	exit 1
+	;;
+esac
+
+exit 0

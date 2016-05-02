@@ -1,0 +1,41 @@
+author      "Sergey Dryabzhinsky <sergey.dryabzhinsky@gmail.com>"
+description "Handles starting of DenyHosts Sync on server reboot, or in the event of an error"
+
+env NAME=denyhosts-server
+env NAME2="DenyHosts sync server"
+env DAEMON="/usr/sbin/denyhosts-server"
+env CONFIG="/etc/denyhosts-server.conf"
+env PIDFILE="/var/run/denyhosts-server.pid"
+env DAEMONUSER=denyhosts-server
+env DAEMONGROUP=denyhosts
+env WORKDIR=/var/lib/denyhosts-server
+
+start on runlevel [2345]
+stop on runlevel [016]
+
+expect daemon
+
+respawn
+respawn limit 10 5
+
+exec start-stop-daemon --start --chuid $DAEMONUSER:$DAEMONGROUP \
+    --chdir $WORKDIR \
+    --make-pidfile --pidfile $PIDFILE --background \
+    --startas $DAEMON -- -c $CONFIG
+
+pre-start script
+	if [ -f $PIDFILE ]; then
+		pid=$(cat $PIDFILE)
+		if kill -0 "$pid" > /dev/null; then
+			start-stop-daemon --stop --quiet --retry 5 --pidfile $PIDFILE
+			echo "Restarting $NAME2" | logger -t "$NAME"
+		else
+			echo "$NAME2 started" | logger -t "$NAME"
+		fi
+		rm -f $PIDFILE
+	fi
+end script
+
+pre-stop script
+	echo "$NAME2 stopped" | logger -t "$NAME"
+end script

@@ -1,0 +1,18 @@
+[Unit]
+Description=DenyHosts synchronisation service
+After=syslog.target
+
+[Service]
+Type=simple
+User=denyhosts-server
+Group=denyhosts
+EnvironmentFile=-/etc/default/denyhosts-server
+WorkingDirectory=/var/lib/denyhosts-server
+ExecStart=/usr/sbin/denyhosts-server -c /etc/denyhosts-server.conf
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=on-failure
+StandardOutput=syslog
+StandardError=syslog
+
+[Install]
+WantedBy=multi-user.target
