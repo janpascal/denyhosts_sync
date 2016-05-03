@@ -44,7 +44,7 @@
 #max_reported_crackers: 50
 
 # TCP addr to listen on. Default: empty (all)
-#listen_host:
+#listen_address:
 
 # TCP port to listen on. Default: 9911
 #listen_port: 9911
@@ -113,9 +113,9 @@
 # Default: yes
 #resolve_hostnames: yes
 
-# TCP addr to serve statistics. Can be the same a the listen_host in the
+# TCP addr to serve statistics. Can be the same a the listen_address in the
 # [sync] section. Default: empty (all)
-#listen_host:
+#listen_address:
 
 # TCP port to serve statistics. Can be the same a the listen_port in the
 # [sync] section. Default: 9911

@@ -165,15 +165,15 @@ def start_listening():
     # /static/graphs
     web_static.putChild('graphs', web_graphs)
 
-    logging.info("Start listening on host:port {}:{}".format(config.xmlrpc_listen_host, config.xmlrpc_listen_port))
+    logging.info("Start listening on host:port {}:{}".format(config.xmlrpc_listen_address, config.xmlrpc_listen_port))
     _xmlrpc_site = server.Site(xmlrpc_root)
-    _xmlrpc_listener = reactor.listenTCP(config.xmlrpc_listen_port, _xmlrpc_site, interface=config.xmlrpc_listen_host)
+    _xmlrpc_listener = reactor.listenTCP(config.xmlrpc_listen_port, _xmlrpc_site, interface=config.xmlrpc_listen_address)
 
-    if config.stats_listen_port == config.xmlrpc_listen_port and config.xmlrpc_listen_host == config.stats_listen_host:
+    if config.stats_listen_port == config.xmlrpc_listen_port and config.xmlrpc_listen_address == config.stats_listen_address:
         _stats_listener = None
     else:
-        logging.info("Start serving statistics on host:port {}:{}".format(config.stats_listen_host, config.stats_listen_port))
-        _stats_listener = reactor.listenTCP(config.stats_listen_port, server.Site(stats_root), interface=config.stats_listen_host)
+        logging.info("Start serving statistics on host:port {}:{}".format(config.stats_listen_address, config.stats_listen_port))
+        _stats_listener = reactor.listenTCP(config.stats_listen_port, server.Site(stats_root), interface=config.stats_listen_address)
 
 maintenance_job = None
 legacy_sync_job = None
