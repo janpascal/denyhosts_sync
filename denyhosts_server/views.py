@@ -32,6 +32,7 @@ import config
 import controllers
 import utils
 import stats
+import peering
 
 class Server(xmlrpc.XMLRPC):
     """
@@ -76,6 +77,7 @@ class Server(xmlrpc.XMLRPC):
                 finally:
                     utils.unlock_host(cracker_ip)
                 logging.debug("Done adding report for {} from {}".format(cracker_ip,remote_ip))
+            peering.send_update(remote_ip, hosts)
         except xmlrpc.Fault, e:
             raise e
         except Exception, e:
@@ -83,6 +85,28 @@ class Server(xmlrpc.XMLRPC):
             raise xmlrpc.Fault(104, "Error adding hosts: {}".format(str(e)))
 
         returnValue(0)
+
+    @withRequest
+    @inlineCallbacks
+    def xmlrpc_peering_update(self, request, key, update):
+        try:
+            logging.info("Receive peering_update call")
+            logging.info("peering_update({}, {})".format(key, update))
+            key = key.decode('hex')
+            update = update.decode('base64')
+            if config.is_master:
+                pass
+            else:
+                yield peering.handle_update_from_master(key, update)
+            #yield
+        except xmlrpc.Fault, e:
+            raise e
+        except Exception, e:
+            log.err(_why="Exception in peering_update")
+            raise xmlrpc.Fault(106, "Error in peering_update({},{})".format(key, update))
+        finally:
+            returnValue({"result":"ok"})
+        
 
     @withRequest
     @inlineCallbacks

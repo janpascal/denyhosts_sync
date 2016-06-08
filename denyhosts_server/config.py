@@ -28,6 +28,15 @@ def _get(config, section, option, default=None):
         result = default
     return result
 
+def _gethex(config, section, option, default=None):
+    try:
+        result = config.get(section, option)
+    except ConfigParser.NoOptionError:
+        result = default
+    if result is not None:
+        result = result.decode('hex')
+    return result
+
 def _getint(config, section, option, default=None):
     try:
         result = config.getint(section, option)
@@ -64,6 +73,7 @@ def read_config(filename):
     global stats_resolve_hostnames
     global stats_listen_port
     global static_dir, graph_dir, template_dir
+    global is_master, key_file, master, slaves
 
     _config = ConfigParser.SafeConfigParser()
     _config.readfp(open(filename,'r'))
@@ -131,3 +141,25 @@ def read_config(filename):
     template_dir = _get(_config, "stats", "template_dir", os.path.join(package_dir, "template"))
     stats_resolve_hostnames = _getboolean(_config, "stats", "resolve_hostnames", True)
     stats_listen_port = _getint(_config, "stats", "listen_port", 9911)
+
+    is_master = _getboolean(_config, "peering", "is_master", True)
+    key_file = _get(_config, "peering", "key_file", os.path.join(package_dir, "keyfile"))
+
+    if is_master:
+        slaves = {   
+                item[1]:
+                _gethex(_config, "peering", item[0].replace("slave_server", "slave_key"))
+            for item in _config.items("peering") 
+            if item[0].startswith("slave_server")
+        }
+    else:
+        master_server = _get(_config, "peering", "master_server") 
+        if master_server is None:
+            logging.error("Slave server without configuration for master server. Add 'master_server' and 'master_key' to your configuration file")
+            master = None
+        else:
+            master = {
+                "server": master_server, 
+                "key": _gethex(_config, "peering", "master_key")
+            }
+

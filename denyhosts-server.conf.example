@@ -46,7 +46,7 @@
 # TCP port to listen on. Default: 9911
 #listen_port: 9911
 
-# Enable debugging methods. See debug_views.py for details.
+# Enable debugging methods. See debug_views.py for details.# Default: no
 # Default: no
 #enable_debug_methods: no
 
@@ -113,3 +113,19 @@
 # TCP port to serve statistics. Can be the same a the listen_port in the
 # [sync] section. Default: 9911
 #listen_port: 9911
+
+[peering]
+is_master: true
+keys_dir: vardata/keys
+
+# If is_master is true: configure _only_ slave servers
+slave_server_1: http://localhost:9921
+slave_key_1: BBCCDDEE
+
+slave_server_2: http://localhost:9922
+slave_key_2: BBCCDDEE
+
+# If is_master is false: configure _only_ the master server
+master_server: http://localhost:9911
+master_key: AABBCCDD
+

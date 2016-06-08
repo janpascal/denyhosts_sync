@@ -36,6 +36,7 @@ import config
 import database
 import stats
 import utils
+import peering
 
 import __init__
 
@@ -244,6 +245,8 @@ def run_main():
         sys.exit()
 
     configure_logging()
+
+    peering.load_keys()
 
     Registry.DBPOOL = adbapi.ConnectionPool(config.dbtype, **config.dbparams)
     Registry.register(models.Cracker, models.Report, models.Legacy)

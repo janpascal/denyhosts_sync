@@ -16,10 +16,10 @@ from twistar.registry import Registry
 
 class TestBase(unittest.TestCase):
     @inlineCallbacks
-    def setUp(self):
+    def setUp(self, config_basename="test.conf"):
         configfile = os.path.join(
             os.path.dirname(inspect.getsourcefile(TestBase)),
-            "test.conf"
+            config_basename
         )
 
         config.read_config(configfile)

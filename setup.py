@@ -13,7 +13,7 @@ setup(name='denyhosts-server',
       author_email='janpascal@vanbest.org',
       url='https://github.com/janpascal/denyhosts_sync',
       packages=['denyhosts_server'],
-      install_requires=["Twisted", "twistar", "ipaddr", "jinja2", "numpy", "matplotlib", "GeoIP", "minify"],
+      install_requires=["Twisted", "twistar", "ipaddr", "jinja2", "numpy", "matplotlib", "GeoIP", "minify", "libnacl"],
       scripts=['scripts/denyhosts-server'],
       data_files=[
         ('static/js', glob('static/js/*.min.js')),
@@ -31,7 +31,7 @@ setup(name='denyhosts-server',
         ),
       ],
       license="""
-Copyright (C) 2015 Jan-Pascal van Best <janpascal@vanbest.org>
+Copyright (C) 2015-2016 Jan-Pascal van Best <janpascal@vanbest.org>
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published
