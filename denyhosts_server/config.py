@@ -1,5 +1,5 @@
 #    denyhosts sync server
-#    Copyright (C) 2015 Jan-Pascal van Best <janpascal@vanbest.org>
+#    Copyright (C) 2015-2016 Jan-Pascal van Best <janpascal@vanbest.org>
 
 #    This program is free software: you can redistribute it and/or modify
 #    it under the terms of the GNU Affero General Public License as published
@@ -73,7 +73,7 @@ def read_config(filename):
     global stats_resolve_hostnames
     global stats_listen_port
     global static_dir, graph_dir, template_dir
-    global is_master, key_file, master, slaves
+    global key_file, peers
 
     _config = ConfigParser.SafeConfigParser()
     _config.readfp(open(filename,'r'))
@@ -142,24 +142,12 @@ def read_config(filename):
     stats_resolve_hostnames = _getboolean(_config, "stats", "resolve_hostnames", True)
     stats_listen_port = _getint(_config, "stats", "listen_port", 9911)
 
-    is_master = _getboolean(_config, "peering", "is_master", True)
-    key_file = _get(_config, "peering", "key_file", os.path.join(package_dir, "keyfile"))
+    key_file = _get(_config, "peering", "key_file", os.path.join(package_dir, "private.key"))
 
-    if is_master:
-        slaves = {   
-                item[1]:
-                _gethex(_config, "peering", item[0].replace("slave_server", "slave_key"))
-            for item in _config.items("peering") 
-            if item[0].startswith("slave_server")
-        }
-    else:
-        master_server = _get(_config, "peering", "master_server") 
-        if master_server is None:
-            logging.error("Slave server without configuration for master server. Add 'master_server' and 'master_key' to your configuration file")
-            master = None
-        else:
-            master = {
-                "server": master_server, 
-                "key": _gethex(_config, "peering", "master_key")
-            }
-
+    peers = {}
+    for item in _config.items("peering"):
+        if item[0].startswith("peer_") and item[0].endswith("_url"):
+            url = item[1]
+            key_key = item[0].replace("_url", "_key")
+            key = _gethex(_config, "peering", key_key);
+            peers[url] = key

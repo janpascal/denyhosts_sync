@@ -1,5 +1,5 @@
 # denyhosts sync server
-# Copyright (C) 2015 Jan-Pascal van Best <janpascal@vanbest.org>
+# Copyright (C) 2015-2016 Jan-Pascal van Best <janpascal@vanbest.org>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published
@@ -15,6 +15,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import logging
+import ipaddr
 
 from twisted.internet.defer import inlineCallbacks, returnValue
 from twisted.internet import reactor, task
@@ -45,5 +46,16 @@ def none_waiting():
 
 def count_waiting():
     return len(_hosts_busy)
+
+def is_valid_ip_address(ip_address):
+    try:
+        ip = ipaddr.IPAddress(ip_address)
+    except:
+        return False
+    if (ip.is_reserved or ip.is_private or ip.is_loopback or
+        ip.is_unspecified or ip.is_multicast or
+        ip.is_link_local):
+        return False
+    return True
 
 # vim: tabstop=8 expandtab shiftwidth=4 softtabstop=4

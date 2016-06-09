@@ -1,5 +1,5 @@
 #    denyhosts sync server
-#    Copyright (C) 2015 Jan-Pascal van Best <janpascal@vanbest.org>
+#    Copyright (C) 2015-2016 Jan-Pascal van Best <janpascal@vanbest.org>
 
 #    This program is free software: you can redistribute it and/or modify
 #    it under the terms of the GNU Affero General Public License as published
@@ -24,7 +24,6 @@ from twisted.web.xmlrpc import withRequest
 from twisted.internet.defer import inlineCallbacks, returnValue
 from twisted.internet import reactor
 from twisted.python import log
-import ipaddr
 
 import models
 from models import Cracker, Report
@@ -39,47 +38,25 @@ class Server(xmlrpc.XMLRPC):
     An example object to be published.
     """
 
-    @staticmethod
-    def is_valid_ip_address(ip_address):
-        try:
-            ip = ipaddr.IPAddress(ip_address)
-        except:
-            return False
-        if (ip.is_reserved or ip.is_private or ip.is_loopback or
-            ip.is_unspecified or ip.is_multicast or
-            ip.is_link_local):
-            return False
-        return True
-
     @withRequest
     @inlineCallbacks
     def xmlrpc_add_hosts(self, request, hosts):
         try:
-            logging.info("add_hosts({}) from {}".format(hosts, request.getClientIP()))
-            for cracker_ip in hosts:
-                if not self.is_valid_ip_address(cracker_ip):
-                    logging.warning("Illegal host ip address {} from {}".format(cracker_ip, request.getClientIP()))
-                    raise xmlrpc.Fault(101, "Illegal IP address \"{}\".".format(cracker_ip))
-
-                logging.debug("Adding report for {} from {}".format(cracker_ip, request.getClientIP()))
-                yield utils.wait_and_lock_host(cracker_ip)
-                try:
-                    cracker = yield Cracker.find(where=['ip_address=?', cracker_ip], limit=1)
-                    if cracker is None:
-                        now = time.time()
-                        cracker = Cracker(ip_address=cracker_ip, first_time=now,
-                            latest_time=now, resiliency=0, total_reports=0, current_reports=0)
-                        yield cracker.save()
-                    yield controllers.add_report_to_cracker(cracker, request.getClientIP())
-                finally:
-                    utils.unlock_host(cracker_ip)
-                logging.debug("Done adding report for {} from {}".format(cracker_ip,request.getClientIP()))
-            peering.send_update(request.getClientIP(), hosts)
+            client_ip = request.getClientIP()
+            now = time.time()
+            logging.info("add_hosts({}) from {}".format(hosts, client_ip))
+            yield controllers.handle_report_from_client(client_ip, now, hosts)
+            try:
+                yield peering.send_update(client_ip, now, hosts)
+            except xmlrpc.Fault, e:
+                raise e
+            except Exception, e:
+                log.err(_why="Exception sending update to peers")
         except xmlrpc.Fault, e:
             raise e
         except Exception, e:
             log.err(_why="Exception in add_hosts")
-            raise xmlrpc.Fault(104, "Error adding hosts: {}".format(str(e)))
+            raise xmlrpc.Fault(104, "Error adding hosts: {}".format(e))
 
         returnValue(0)
 
@@ -87,23 +64,34 @@ class Server(xmlrpc.XMLRPC):
     @inlineCallbacks
     def xmlrpc_peering_update(self, request, key, update):
         try:
-            logging.info("Receive peering_update call")
             logging.info("peering_update({}, {})".format(key, update))
             key = key.decode('hex')
             update = update.decode('base64')
-            if config.is_master:
-                pass
-            else:
-                yield peering.handle_update_from_master(key, update)
-            #yield
+            yield peering.handle_update(key, update)
         except xmlrpc.Fault, e:
             raise e
         except Exception, e:
             log.err(_why="Exception in peering_update")
-            raise xmlrpc.Fault(106, "Error in peering_update({},{})".format(key, update))
-        finally:
-            returnValue({"result":"ok"})
-        
+            raise xmlrpc.Fault(105, "Error in peering_update({},{})".format(key, update))
+        returnValue(0)
+
+    @withRequest
+    @inlineCallbacks
+    def xmlrpc_list_peers(self, request, key, please):
+        try:
+            logging.info("Received list_peers call")
+            logging.info("list_peers({}, {})".format(key, please))
+            key = key.decode('hex')
+            please = please.decode('base64')
+            result = peering.list_peers(key, please)
+            yield
+            returnValue(result)
+        except xmlrpc.Fault, e:
+            raise e
+        except Exception, e:
+            log.err(_why="Exception in peering_update")
+            raise xmlrpc.Fault(106, "Error in peering_update({},{})".format(key, please))
+        returnValue(0)
 
     @withRequest
     @inlineCallbacks
@@ -126,7 +114,7 @@ class Server(xmlrpc.XMLRPC):
                 raise xmlrpc.Fault(103, "Illegal timestamp.")
 
             for host in hosts_added:
-                if not self.is_valid_ip_address(host):
+                if not utils.is_valid_ip_address(host):
                     logging.warning("Illegal host ip address {}".format(host))
                     raise xmlrpc.Fault(101, "Illegal IP address \"{}\".".format(host))
 
