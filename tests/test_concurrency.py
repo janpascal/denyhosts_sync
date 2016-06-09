@@ -31,7 +31,7 @@ class ConcurrencyTest(base.TestBase):
     def test_try_and_confuse_server(self):
         self.view = views.Server()
         request = MockRequest("127.0.0.1")
-        for i in range(0, 50):
+        for i in range(0, 25):
             print("count:{}".format(i))
 
             self.count = 0

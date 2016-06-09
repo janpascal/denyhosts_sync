@@ -17,6 +17,7 @@
 import logging
 import json
 import os.path
+import xmlrpclib
 from xmlrpclib import ServerProxy
 
 from twisted.internet.defer import inlineCallbacks, returnValue
@@ -25,78 +26,154 @@ from twisted.internet.threads  import deferToThread
 import libnacl.public
 import libnacl.utils
 
+import __init__
 import config
+import controllers
 
 _own_key = None
 
-def send_update(originating_ip, hosts):
-    if config.is_master:
-        send_update_to_slaves(originating_ip, hosts)
-    else:
-        send_update_to_master(originating_ip, hosts)
-
 @inlineCallbacks
-def send_update_to_slaves(originating_ip, hosts):
-    # FIXME: do this in a separate thread
-    for slave in config.slaves:
-        logging.debug("Sending update to slave {}".format(slave))
-        print("slave: {}".format(slave))
+def send_update(client_ip, timestamp, hosts):
+    for peer in config.peers:
+        logging.debug("Sending update to peer {}".format(peer))
+        logging.debug("peer: {}".format(peer))
         data = {
-            "ip": originating_ip,
+            "client_ip": client_ip,
+            "timestamp": timestamp,
             "hosts": hosts
         }
         data_json = json.dumps(data)
-        logging.debug("json data: {}".format(data_json))
-        crypted = _slave_boxes[slave].encrypt(data_json)
-        print("crypted: {}".format(crypted))
+        crypted = _peer_boxes[peer].encrypt(data_json)
         base64 = crypted.encode('base64')
-        print("base64 encoded crypted data: {}".format(base64))
 
-        server = yield deferToThread(ServerProxy, slave)
-        #yield deferToThread(server.peering_update, server, base64)
-        slave_key = config.slaves[slave].encode('hex')
-        server.peering_update(slave_key, base64)
-        yield deferToThread(server.close, server)
+        server = yield deferToThread(ServerProxy, peer)
+        yield deferToThread(server.peering_update, _own_key.pk.encode('hex'), base64)
 
 @inlineCallbacks
-def handle_update_from_slave(slave_key, update):
-    slave = None
-    for _slave in config.slaves:
-        if config.slaves[_slave] == slave_key:
-            slave = _slave
+def handle_update(peer_key, update):
+    peer = None
+    for _peer in config.peers:
+        if config.peers[_peer] == peer_key:
+            peer = _peer
             break
-    if slave is None:
-        logger.warning("Got update from unknown slave with key {}".format(slave_key.encode('hex')))
+    if peer is None:
+        logging.warning("Got update from unknown peer with key {}".format(peer_key.encode('hex')))
+        raise Exception("Unknown key {}".format(peer_key.encode('hex')))
 
-@inlineCallbacks
-def handle_update_from_master(master_key, update):
-    if master_key != config.master["key"]:
-        logging.error("I am a slave, got update from somewhere with unknown key {}".format(master_key.encode('hex')))
-        raise Exception("Unknown key {}".format(master_key.encode('hex')))
-    json = _master_box.decrypt(update)
-    logger.info("Update from master as json: {}".format(json))
+    # Critical point: use our own key, instead of the one supplied by the peer
+    json_data = _peer_boxes[peer].decrypt(update)
+    data = json.loads(json_data)
+
+    hosts = data["hosts"]
+    client_ip = data["client_ip"]
+    timestamp = data["timestamp"]
+
+    yield controllers.handle_report_from_client(client_ip, timestamp, hosts)
+
+def list_peers(peer_key, please):
+    peer = None
+    for _peer in config.peers:
+        if config.peers[_peer] == peer_key:
+            peer = _peer
+            break
+    if peer is None:
+        logging.warning("Got list_peer request from unknown peer with key {}".format(peer_key.encode('hex')))
+        raise Exception("Unknown key {}".format(peer_key.encode('hex')))
+
+    # Critical point: use our own key, instead of the one supplied by the peer
+    logging.debug("Listing peers, requested by {}".format(peer))
+    data = _peer_boxes[peer].decrypt(please)
+    if data != "please":
+        logging.warning("Request for list_peers is something else than please: {}".format(data))
+        raise Exception("Illegal request {}".format(data))
+
+    return {
+            "server_version": __init__.version,
+            "peers": {
+                peer: config.peers[peer].encode('hex') 
+                for peer in config.peers
+            }
+    }
 
 def load_keys():
     global _own_key
-    global _master_box
-    global _slave_boxes
+    global _peer_boxes
 
     try:
         _own_key = libnacl.utils.load_key(config.key_file)
     except:
+        logging.info("No private key yet, creating one in {}".format(config.key_file))
         _own_key = libnacl.public.SecretKey()
         _own_key.save(config.key_file)
 
-    if config.is_master:
-        _slave_boxes = {
-            slave: 
-            libnacl.public.Box(_own_key.sk, libnacl.public.PublicKey(config.slaves[slave]))
-            for slave in config.slaves
-        }
+    _peer_boxes = {
+        peer: 
+        libnacl.public.Box(_own_key.sk, libnacl.public.PublicKey(config.peers[peer]))
+        for peer in config.peers
+    }
+
+    logging.debug("Configured peers: {}".format(config.peers))
+
+def check_peers():
+    """ Connect to all configured peers. Check if they are reachable, and if their
+    list of peers and associated keys conforms to mine """
+    success = True
+    for peer in config.peers:
+        print("Examining peer {}...".format(peer))
+        peer_server = ServerProxy(peer)
+        try:
+            response = peer_server.list_peers(_own_key.pk.encode('hex'), _peer_boxes[peer].encrypt('please').encode('base64'))
+        except Exception, e:
+            print("Error requesting peer list from {} (maybe it's down, or it doesn't know my key!)".format(peer))
+            print("Error message: {}".format(e))
+            success = False
+            continue
+
+        print("    Peer version: {}".format(response["server_version"]))
+        peer_list = response["peers"]
+
+        # peer list should contain all the peers I know, except for the peer I'm asking, but including myself
+        seen_peers = set()
+        for other_peer in config.peers:
+            if other_peer == peer:
+                continue
+            if other_peer not in peer_list:
+                print("    Peer {} does not know peer {}!".format(peer, other_peer))
+                success = False
+                continue
+            if config.peers[other_peer] != peer_list[other_peer].decode('hex'):
+                print("    Peer {} knows peer {} but with key {} instead of {}!".format(peer, other_peer, peer_list[other_peer], config.peers[other_peer].encode('hex')))
+                success = False
+                continue
+            print("    Common peer (OK): {}".format(other_peer))
+            seen_peers.add(other_peer)
+
+        # Any keys not seen should be my own
+        own_key_seen = False
+        for other_peer in peer_list:
+            if other_peer in seen_peers:
+                continue
+            if peer_list[other_peer].decode('hex') == _own_key.pk:
+                own_key_seen = True
+                print("    Peer {} knows me as {} (OK)".format(peer, other_peer))
+                continue
+            print("    Peer {} knows about (to me) unknown peer {} with key {}!".format(peer, other_peer, peer_list[other_peer]))
+            success = False
+
+        if not own_key_seen:
+            print("    Peer {} does not know about me!")
+            success = False
+
+    if success:
+        print("All peer servers configured correctly")
     else:
-        if config.master is not None:
-            master_key = libnacl.public.PublicKey(config.master["key"])
-            #print("Using master key: {} -> {}".format(config.master["key"], master_key))
-            _master_box = libnacl.public.Box(_own_key.sk, master_key)
+        print("Inconsistent peer server configuration, check all configuration files!")
+
+    return success
+
+        
+
+
+
 
 # vim: tabstop=8 expandtab shiftwidth=4 softtabstop=4

@@ -15,6 +15,8 @@ of `denyhosts`.
 - Synchronisation algorithm that has safeguards against database poisoning
 - Fully configurable
 - Dynamically generated statistics web page
+- Peering mode: multiple servers can shared their information for load-balancing
+and to prevent a single point of failure
 
 ## Prerequisites
 - MySQL database is preferred for large sites. For testing purposes sqlite is
@@ -100,6 +102,30 @@ Note: Use these options with care. Do not use them while `denyhosts-server` is
 running, since this may cause database inconsistencies. Use the `--force`
 command line options to skip the safety prompt when using the purge options.
 
+## Peering
+If you wish to configure peering between multiple servers, do the following.
+In the configuration file look at the `[peering]` section. Set the
+`key_file` option and restart `denyhosts-server`. It will create a new key file
+if it doesn't exist yet. If you look at the contents of the key file, note that
+it contains two keys. The `pub` (for "public") key should be used in the 
+configuration files of the peers.
+
+For each peer, add two lines to the `[peering]` section. If you name the peer 
+`PEERNAME`, add the peer's url as `peer_PEERNAME_url` and add its public key 
+(a 32-byte random number, represented as a hexadecimal string) as 
+`peer_PEERNAME_key`. 
+
+Make sure that the peering configuration of all participating peers is consistent, 
+i.e., every peer should know the URLs and keys of all other peers. You can use the
+`--check-peers` command line option to perform this consistency check. It will 
+ask all configured peers for their list of peers, and compare them with the ones
+it knows.
+
+All peer-to-peer communication is fully encrypted and authenticated, to prevent
+denial of service attacks. Peers will share reports by clients directly when 
+received. If a peer is offline for a while, it will NOT receive the reports
+it missed.
+
 ## Links
 - [`denyhosts-server` project site](https://github.com/janpascal/denyhosts_sync)
 - [`denyhosts` project site](https://github.com/denyhosts/denyhosts)
@@ -109,7 +135,7 @@ command line options to skip the safety prompt when using the purge options.
 ## Copyright and license
 
 ### denyhosts-server
-Copyright (C) 2015 Jan-Pascal van Best <janpascal@vanbest.org>
+Copyright (C) 2015-2016 Jan-Pascal van Best <janpascal@vanbest.org>
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published

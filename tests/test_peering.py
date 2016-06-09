@@ -19,6 +19,7 @@ import os.path
 import time
 import subprocess
 
+from denyhosts_server import config
 from denyhosts_server import models
 from denyhosts_server import controllers 
 from denyhosts_server import database
@@ -26,32 +27,64 @@ from denyhosts_server.models import Cracker, Report
 
 from twisted.internet.defer import inlineCallbacks, returnValue
 
+import libnacl.public
+import libnacl.utils
+
 import base
 import logging
 
 from denyhosts_server import peering
 
+# TODO
+# What to test:
+# 1. update sent to slaves get processed by slave correctly
+# 2. wrong key is detected
+# 3. update is sent encrypted
+# 4. list_peers works correctly
+# 5. check_peers works correctly
+
 class TestPeering(base.TestBase):
     @inlineCallbacks
     def setUp(self):
-        yield base.TestBase.setUp(self, "test-master.conf")
+        yield base.TestBase.setUp(self, "peer0.conf")
+        peering.load_keys()
 
-        # Start slave server
+        # Start peer servers
         cwd = os.path.join(os.getcwd(), "..")
-        self.slave1=subprocess.Popen("PYTHONPATH=. scripts/denyhosts-server -c sqlite_slave1.conf", cwd=cwd, shell=True)
-        self.slave2=subprocess.Popen("PYTHONPATH=. scripts/denyhosts-server -c sqlite_slave2.conf", cwd=cwd, shell=True)
+        print("Cleaning peer servers...")
+        peer1=subprocess.Popen("PYTHONPATH=. scripts/denyhosts-server -c tests/peer1.conf --recreate-database --force", cwd=cwd, shell=True)
+        peer2=subprocess.Popen("PYTHONPATH=. scripts/denyhosts-server -c tests/peer2.conf --recreate-database --force", cwd=cwd, shell=True)
+        peer1.wait()
+        peer2.wait()
+
+        print("Starting peer servers...")
+        self.peer1=subprocess.Popen("PYTHONPATH=. scripts/denyhosts-server -c tests/peer1.conf", cwd=cwd, shell=True)
+        self.peer2=subprocess.Popen("PYTHONPATH=. scripts/denyhosts-server -c tests/peer2.conf", cwd=cwd, shell=True)
+
         time.sleep(3)
         yield
 
     def tearDown(self):
-        self.slave1.terminate()
-        self.slave2.terminate()
+        print("Shutting down peer1...")
+        self.peer1.terminate()
+        print("Shutting down peer2...")
+        self.peer2.terminate()
 
     @inlineCallbacks
-    def test_send_update_to_slaves(self):
-        peering.load_keys()
-        yield peering.send_update_to_slaves("11.11.11.11", ["1.1.1.1", "2.2.2.2",
-        "3.3.3.3"])
+    def test_send_update_to_peers(self):
+        yield peering.send_update("11.11.11.11", time.time(), ["1.1.1.1", "2.2.2.2", "3.3.3.3"])
+        # TODO check that the peers actually have the update
 
+    @inlineCallbacks
+    def test_list_peers(self):
+        peer_url = "http://test.peer:9911"
+        peer_keypair = libnacl.public.SecretKey()
+        config.peers[peer_url] = peer_keypair.pk
+        peering._peer_boxes[peer_url] = libnacl.public.Box(peering._own_key.sk, libnacl.public.PublicKey(peer_keypair.pk))
+        box = libnacl.public.Box(peer_keypair.sk, peering._own_key.pk)
+        please = box.encrypt("please")
+        peer_list = yield peering.list_peers(peer_keypair.pk, please)
+        print(peer_list)
+        # TODO check that this is actually my own peer list
         
 # vim: tabstop=8 expandtab shiftwidth=4 softtabstop=4

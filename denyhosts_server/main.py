@@ -1,5 +1,5 @@
 # denyhosts sync server
-# Copyright (C) 2015 Jan-Pascal van Best <janpascal@vanbest.org>
+# Copyright (C) 2015-2016 Jan-Pascal van Best <janpascal@vanbest.org>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published
@@ -231,6 +231,8 @@ def run_main():
         help="Purge all hosts that have been reported by clients. DO NOT USE WHEN DENYHOSTS-SERVER IS RUNNING!")
     parser.add_argument("--purge-ip", action='store',
         help="Purge ip address from both legacy and reported host lists. DO NOT USE WHEN DENYHOSTS-SERVER IS RUNNING!")
+    parser.add_argument("--check-peers", action="store_true", 
+        help="Check if all peers are responsive, and if they agree about the peer list")
     parser.add_argument("-f", "--force", action='store_true',
         help="Do not ask for confirmation, execute action immediately")
     args = parser.parse_args()
@@ -263,6 +265,12 @@ def run_main():
         reply = raw_input("Are you sure you want to continue (Y/N): ")
         if not reply.upper().startswith('Y'):
             sys.exit()
+
+    if args.check_peers:
+        if peering.check_peers():
+            sys.exit(0)
+        else:
+            sys.exit(1)
 
     if args.recreate_database:
         single_shot = True

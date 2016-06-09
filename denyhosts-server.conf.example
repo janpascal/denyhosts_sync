@@ -114,18 +114,23 @@
 # [sync] section. Default: 9911
 #listen_port: 9911
 
+# This section deals with peering. You can configure multiple server to share
+# reports with each other in a secure way.
+# See README.md for details.
+
 [peering]
-is_master: true
-keys_dir: vardata/keys
+# Where to keep the private key of this server. This file is generated automatically.
+# Default: private.key
+#key_file: private.key 
 
-# If is_master is true: configure _only_ slave servers
-slave_server_1: http://localhost:9921
-slave_key_1: BBCCDDEE
-
-slave_server_2: http://localhost:9922
-slave_key_2: BBCCDDEE
-
-# If is_master is false: configure _only_ the master server
-master_server: http://localhost:9911
-master_key: AABBCCDD
+# For every peer, configure the url and the (32 byte, hex-encoded) public key
+# using peer_PEERNAME_url and peer_PEERNAME_key. 
+# Default: no peers configured
+#
+# Example:
+#peer_1_url: http://deny1.resonatingmedia.com:9911
+#peer_1_key: 1cecef18aa25fca070cb22e110f32bd87dc38ae56d4c7549a0d579f0fba2835d
+#peer_2_url: http://deny2.resonatingmedia.com:9911
+#peer_2_key: 4a4f9f0a7077e132bbae7eeb663b034d79e804bce25bd30c4a8471415f9d997d
+#
 

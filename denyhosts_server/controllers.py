@@ -1,5 +1,5 @@
 # denyhosts sync server
-# Copyright (C) 2015 Jan-Pascal van Best <janpascal@vanbest.org>
+# Copyright (C) 2015-2016 Jan-Pascal van Best <janpascal@vanbest.org>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published
@@ -29,6 +29,26 @@ import utils
 
 def get_cracker(ip_address):
     return Cracker.find(where=["ip_address=?",ip_address], limit=1)
+
+@inlineCallbacks
+def handle_report_from_client(client_ip, timestamp, hosts):
+    for cracker_ip in hosts:
+        if not utils.is_valid_ip_address(cracker_ip):
+            logging.warning("Illegal host ip address {} from {}".format(cracker_ip, client_ip))
+            raise Exception("Illegal IP address \"{}\".".format(cracker_ip))
+
+        logging.debug("Adding report for {} from {}".format(cracker_ip, client_ip))
+        yield utils.wait_and_lock_host(cracker_ip)
+        try:
+            cracker = yield Cracker.find(where=['ip_address=?', cracker_ip], limit=1)
+            if cracker is None:
+                cracker = Cracker(ip_address=cracker_ip, first_time=timestamp,
+                    latest_time=timestamp, resiliency=0, total_reports=0, current_reports=0)
+                yield cracker.save()
+            yield add_report_to_cracker(cracker, client_ip, when=timestamp)
+        finally:
+            utils.unlock_host(cracker_ip)
+        logging.debug("Done adding report for {} from {}".format(cracker_ip,client_ip))
 
 # Note: lock cracker IP first!
 # Report merging algorithm by Anne Bezemer, see 
