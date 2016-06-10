@@ -21,6 +21,7 @@ def sleep(seconds):
 class MockRequest:
     def __init__(self, ip):
         self._ip = ip
+        self.received_headers = {}
 
     def getClientIP(self):
         return self._ip
