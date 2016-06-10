@@ -27,5 +27,5 @@ class TestBase(unittest.TestCase):
         Registry.DBPOOL = adbapi.ConnectionPool(config.dbtype, **config.dbparams)
         Registry.register(models.Cracker, models.Report, models.Legacy)
 
-        yield database.clean_database()
+        yield database.clean_database(quiet=True)
         main.configure_logging()
