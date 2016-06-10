@@ -49,19 +49,23 @@ def send_update(client_ip, timestamp, hosts):
         server = yield deferToThread(ServerProxy, peer)
         yield deferToThread(server.peering_update, _own_key.pk.encode('hex'), base64)
 
-@inlineCallbacks
-def handle_update(peer_key, update):
+def decrypt_message(peer_key, message):
     peer = None
     for _peer in config.peers:
         if config.peers[_peer] == peer_key:
             peer = _peer
             break
     if peer is None:
-        logging.warning("Got update from unknown peer with key {}".format(peer_key.encode('hex')))
+        logging.warning("Got message from unknown peer with key {}".format(peer_key.encode('hex')))
         raise Exception("Unknown key {}".format(peer_key.encode('hex')))
 
     # Critical point: use our own key, instead of the one supplied by the peer
-    json_data = _peer_boxes[peer].decrypt(update)
+    message = _peer_boxes[peer].decrypt(message)
+    return message
+
+@inlineCallbacks
+def handle_update(peer_key, update):
+    json_data = decrypt_message(peer_key, update)
     data = json.loads(json_data)
 
     hosts = data["hosts"]
@@ -71,18 +75,8 @@ def handle_update(peer_key, update):
     yield controllers.handle_report_from_client(client_ip, timestamp, hosts)
 
 def list_peers(peer_key, please):
-    peer = None
-    for _peer in config.peers:
-        if config.peers[_peer] == peer_key:
-            peer = _peer
-            break
-    if peer is None:
-        logging.warning("Got list_peer request from unknown peer with key {}".format(peer_key.encode('hex')))
-        raise Exception("Unknown key {}".format(peer_key.encode('hex')))
+    data = decrypt_message(peer_key, please)
 
-    # Critical point: use our own key, instead of the one supplied by the peer
-    logging.debug("Listing peers, requested by {}".format(peer))
-    data = _peer_boxes[peer].decrypt(please)
     if data != "please":
         logging.warning("Request for list_peers is something else than please: {}".format(data))
         raise Exception("Illegal request {}".format(data))
