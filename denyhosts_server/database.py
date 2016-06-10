@@ -25,8 +25,12 @@ import GeoIP
 import config
 import stats
 
+_quiet = False
+
 def _remove_tables(txn):
-    print("Removing all data from database and removing tables")
+    global _quiet
+    if not _quiet: 
+        print("Removing all data from database and removing tables")
     txn.execute("DROP TABLE IF EXISTS info")
     txn.execute("DROP TABLE IF EXISTS crackers")
     txn.execute("DROP TABLE IF EXISTS reports")
@@ -123,6 +127,7 @@ def _evolve_database_v7(txn, dbtype):
     stats.update_recent_history_txn(txn)
 
 def _evolve_database_v8(txn, dbtype):
+    global _quiet
     txn.execute("""CREATE TABLE country_history (
         country_code CHAR(5) PRIMARY KEY,
         country VARCHAR(50),
@@ -131,10 +136,12 @@ def _evolve_database_v8(txn, dbtype):
     txn.execute("CREATE INDEX country_history_count ON country_history(num_reports)")
     txn.execute('INSERT INTO `info` VALUES ("last_country_history_update", "1900-01-01")')
 
-    print("Calculating per-country totals...")
+    if not _quiet:
+        print("Calculating per-country totals...")
     stats.update_country_history_txn(txn, None, include_history=True)
 
-    print("Fixing up historical data...")
+    if not _quiet:
+        print("Fixing up historical data...")
     stats.fixup_history_txn(txn)
 
 _evolutions = {
@@ -151,7 +158,9 @@ _evolutions = {
 _schema_version = len(_evolutions)
 
 def _evolve_database(txn):
-    print("Evolving database")
+    global _quiet
+    if not _quiet:
+        print("Evolving database")
     dbtype = config.dbtype
 
     try:
@@ -160,23 +169,28 @@ def _evolve_database(txn):
         if result is not None:
             current_version = int(result[0])
         else:
-            print("No schema version in database")
+            if not _quiet:
+                print("No schema version in database")
             _evolve_database_initial(txn, dbtype)
             current_version = 0
     except:
-        print("No schema version in database")
+        if not _quiet:
+            print("No schema version in database")
         _evolve_database_initial(txn, dbtype)
         current_version = 0
 
     if current_version > _schema_version:
-        print("Illegal database schema {}".format(current_version))
+        if not _quiet:
+            print("Illegal database schema {}".format(current_version))
         return
 
-    print("Current database schema is version {}".format(current_version))
+    if not _quiet:
+        print("Current database schema is version {}".format(current_version))
 
     while current_version < _schema_version:
         current_version += 1
-        print("Evolving database to version {}...".format(current_version))
+        if not _quiet:
+            print("Evolving database to version {}...".format(current_version))
         _evolutions[current_version](txn, dbtype)
 
         if dbtype=="sqlite3":
@@ -184,31 +198,37 @@ def _evolve_database(txn):
         elif dbtype=="MySQLdb":
             txn.execute('UPDATE info SET `value`=%s WHERE `key`="schema_version"', (str(current_version),))
 
-    print("Updated database schema, current version is {}".format(_schema_version))
+    if not _quiet:
+        print("Updated database schema, current version is {}".format(_schema_version))
 
 def evolve_database():
     return Registry.DBPOOL.runInteraction(_evolve_database)
 
 @inlineCallbacks
-def clean_database():
+def clean_database(quiet = False):
+    global _quiet
+    _quiet = quiet
     yield Registry.DBPOOL.runInteraction(_remove_tables)
     yield Registry.DBPOOL.runInteraction(_evolve_database)
 
 @inlineCallbacks
 def check_database_version():
+    global _quiet
     try:
         rows = yield Registry.DBPOOL.runQuery('SELECT `value` FROM `info` WHERE `key`="schema_version"')
         if rows is not None:
             current_version = int(rows[0][0])
         else:
-            print("No schema version in database")
+            if not _quiet:
+                print("No schema version in database")
             current_version = 0
     except:
         current_version = 0
 
     if current_version != _schema_version:
         logging.debug("Wrong database schema {}, expecting {}, exiting".format(current_version, _schema_version))
-        print("Wrong database schema {}, expecting {}, exiting".format(current_version, _schema_version))
+        if not _quiet:
+            print("Wrong database schema {}, expecting {}, exiting".format(current_version, _schema_version))
         from twisted.internet import reactor
         reactor.stop()
     else:
@@ -218,12 +238,14 @@ def check_database_version():
 # FIXME Not the proper way. What if there's a question mark somewhere
 # else in the query?
 def translate_query(query):
+    global _quiet
     if config.dbtype == "MySQLdb":
         return query.replace('?', '%s')
     elif config.dbtype == "sqlite3":
         return query
     else:
-        print("unsupported database {}".format(config.dbtype))
+        if not _quiet:
+            print("unsupported database {}".format(config.dbtype))
         return query
 
 def run_query(query, *args):
@@ -233,10 +255,12 @@ def run_operation(query, *args):
     return Registry.DBPOOL.runOperation(translate_query(query), args)
 
 def run_truncate_query(table):
+    global _quiet
     if config.dbtype == "MySQLdb":
         query = "TRUNCATE TABLE `{}`".format(table)
     elif config.dbtype == "sqlite3":
         query = "DELETE FROM `{}`".format(table)
     else:
-        print("unsupported database {}".format(config.dbtype))
+        if not _quiet:
+            print("unsupported database {}".format(config.dbtype))
     return Registry.DBPOOL.runQuery(query)
