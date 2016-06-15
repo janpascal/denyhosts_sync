@@ -359,7 +359,7 @@ def make_country_bargraph(txn):
     for bar in bars:
         height = bar.get_height()
         ax.text(max_count / 20., bar.get_y() + height / 2., 
-            "{}% {}".format(round(counts[count]/total_reports*100), countries[count] ),
+            "{}% {}".format(round(counts[count]*1.0/total_reports*100), countries[count] ),
             ha='left', va='center')
         count += 1
     ax.set_yticks(y_pos)
