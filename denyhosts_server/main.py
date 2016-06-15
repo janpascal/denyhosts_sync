@@ -30,6 +30,7 @@ from twistar.registry import Registry
 
 import views
 import debug_views
+import peering_views
 import models
 import controllers
 import config
@@ -155,6 +156,10 @@ def start_listening():
 
     # /RPC2
     xmlrpc_root.putChild('RPC2', main_xmlrpc_handler)
+
+    # Peering handler
+    p = peering_views.PeeringServer(main_xmlrpc_handler)
+    main_xmlrpc_handler.putSubHandler('peering', p)
 
     # xmlrpc debug handler
     if config.enable_debug_methods:

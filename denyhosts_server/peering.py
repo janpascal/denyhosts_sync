@@ -41,7 +41,6 @@ _own_key = None
 def send_update(client_ip, timestamp, hosts):
     for peer in config.peers:
         logging.debug("Sending update to peer {}".format(peer))
-        logging.debug("peer: {}".format(peer))
         data = {
             "client_ip": client_ip,
             "timestamp": timestamp,
@@ -53,7 +52,7 @@ def send_update(client_ip, timestamp, hosts):
 
         try:
             server = yield deferToThread(ServerProxy, peer)
-            yield deferToThread(server.peering_update, _own_key.pk.encode('hex'), base64)
+            yield deferToThread(server.peering.update, _own_key.pk.encode('hex'), base64)
         except:
             logging.warning("Unable to send update to peer {}".format(peer))
 
@@ -165,7 +164,7 @@ def bootstrap_from(peer_url):
     please_base64 = crypted.encode('base64')
 
     server = yield deferToThread(ServerProxy, peer_url)
-    remote_schema = yield server.peering_schema_version(_own_key.pk.encode('hex'), please_base64)
+    remote_schema = yield server.peering.schema_version(_own_key.pk.encode('hex'), please_base64)
 
     print("Initializing database...")
     yield database.clean_database()
@@ -177,7 +176,7 @@ def bootstrap_from(peer_url):
 
     logging.debug("Remote database schema: {}; local schema: {}".format(remote_schema, local_schema))
 
-    hosts = yield deferToThread(server.peering_all_hosts, _own_key.pk.encode('hex'), please_base64)
+    hosts = yield deferToThread(server.peering.all_hosts, _own_key.pk.encode('hex'), please_base64)
 
     #logging.debug("Hosts from peer: {}".format(hosts))
     print("Copying data of {} hosts from peer".format(len(hosts)), end="")
@@ -194,7 +193,7 @@ def bootstrap_from(peer_url):
 
         crypted = _peer_boxes[peer_url].encrypt(host_ip)
         base64 = crypted.encode('base64')
-        response = yield deferToThread(server.peering_all_reports_for_host, _own_key.pk.encode('hex'), base64)
+        response = yield deferToThread(server.peering.all_reports_for_host, _own_key.pk.encode('hex'), base64)
         #logging.debug("All reports response: {}".format(response))
 
         for r in response:
@@ -205,7 +204,7 @@ def bootstrap_from(peer_url):
         print("Copying {} table from peer...".format(table))
         crypted = _peer_boxes[peer_url].encrypt(table)
         base64 = crypted.encode('base64')
-        rows = yield deferToThread(server.peering_dump_table, _own_key.pk.encode('hex'), base64)
+        rows = yield deferToThread(server.peering.dump_table, _own_key.pk.encode('hex'), base64)
         for row in rows:
             database.bootstrap_table(table, row)
 

@@ -3,9 +3,24 @@ import xmlrpclib
 import time
 import threading
 import random
+import ipaddr
+
+def is_valid_ip_address(ip_address):
+    try:
+        ip = ipaddr.IPAddress(ip_address)
+    except:
+        return False
+    if (ip.is_reserved or ip.is_private or ip.is_loopback or
+        ip.is_unspecified or ip.is_multicast or
+        ip.is_link_local):
+        return False
+    return True
 
 def random_ip_address():
-    return ".".join(map(str, (random.randint(0, 255) for _ in range(4))))
+    while True:
+        ip = ".".join(map(str, (random.randint(0, 255) for _ in range(4))))
+        if is_valid_ip_address(ip):
+            return ip
 
 server = 'http://localhost:9911'
 
