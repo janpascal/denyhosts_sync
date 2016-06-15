@@ -16,6 +16,7 @@
 
 import logging
 import datetime
+import time
 
 from twistar.registry import Registry
 from twisted.internet.defer import inlineCallbacks, returnValue
@@ -212,8 +213,7 @@ def clean_database(quiet = False):
     yield Registry.DBPOOL.runInteraction(_evolve_database)
 
 @inlineCallbacks
-def check_database_version():
-    global _quiet
+def get_schema_version():
     try:
         rows = yield Registry.DBPOOL.runQuery('SELECT `value` FROM `info` WHERE `key`="schema_version"')
         if rows is not None:
@@ -224,6 +224,12 @@ def check_database_version():
             current_version = 0
     except:
         current_version = 0
+    returnValue(current_version)
+
+@inlineCallbacks
+def check_database_version():
+    global _quiet
+    current_version = yield get_schema_version()
 
     if current_version != _schema_version:
         logging.debug("Wrong database schema {}, expecting {}, exiting".format(current_version, _schema_version))
@@ -264,3 +270,41 @@ def run_truncate_query(table):
         if not _quiet:
             print("unsupported database {}".format(config.dbtype))
     return Registry.DBPOOL.runQuery(query)
+
+def dump_crackers():
+    return run_query("SELECT * FROM crackers")
+
+@inlineCallbacks
+def dump_table(table):
+    rows = yield run_query("SELECT * FROM " + table)
+
+    for i in xrange(len(rows)):
+        row = rows[i]
+        for j in xrange(len(row)):
+            if isinstance(row[j], datetime.date):
+                l = list(row)
+                l[j] =time.mktime(row[j].timetuple())
+                rows[i] = tuple(l)
+
+def dump_reports_for_cracker(cracker_ip):
+    logging.debug("database.dump_reports_for_cracker({})".format(cracker_ip))
+    return run_query("SELECT r.* FROM reports r JOIN crackers c ON r.cracker_id = c.id WHERE c.ip_address=?", cracker_ip) 
+
+def bootstrap_table(table, params):
+    if table=="info" and params[0]=="schema_version":
+        return None
+    query = "INSERT INTO " + table + " VALUES (" + ",".join(["?"]*len(params)) + ")"
+    return run_operation(query, *params)
+
+def bootstrap_cracker(params):
+    #query = "INSERT INTO crackers VALUES (" + ",".join(["?"]*len(params)) + ")"
+    #logging.debug("Insert statement: {}".format(query))
+    #return run_operation(query, *params)
+    return bootstrap_table("crackers", params)
+
+def bootstrap_report(params):
+    #query = "INSERT INTO reports VALUES (" + ",".join(["?"]*len(params)) + ")"
+    #logging.debug("Insert statement: {}".format(query))
+    #return run_operation(query, *params)
+    return bootstrap_table("reports", params)
+

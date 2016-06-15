@@ -53,7 +53,7 @@ class Server(xmlrpc.XMLRPC):
             except xmlrpc.Fault, e:
                 raise e
             except Exception, e:
-                log.err(_why="Exception sending update to peers")
+                logging.warning("Error sending update to peers")
         except xmlrpc.Fault, e:
             raise e
         except Exception, e:
@@ -79,6 +79,66 @@ class Server(xmlrpc.XMLRPC):
 
     @withRequest
     @inlineCallbacks
+    def xmlrpc_peering_schema_version(self, request, key, please):
+        try:
+            logging.info("peering_schema_version({}, {})".format(key, please))
+            key = key.decode('hex')
+            please = please.decode('base64')
+            result = yield peering.handle_schema_version(key, please)
+            returnValue(result)
+        except xmlrpc.Fault, e:
+            raise e
+        except Exception, e:
+            log.err(_why="Exception in peering_schema_version")
+            raise xmlrpc.Fault(106, "Error in peering_schema_version({},{})".format(key, please))
+
+    @withRequest
+    @inlineCallbacks
+    def xmlrpc_peering_all_hosts(self, request, key, please):
+        try:
+            logging.info("peering_all_hosts({}, {})".format(key, please))
+            key = key.decode('hex')
+            please = please.decode('base64')
+            result = yield peering.handle_all_hosts(key, please)
+            returnValue(result)
+        except xmlrpc.Fault, e:
+            raise e
+        except Exception, e:
+            log.err(_why="Exception in peering_all_hosts")
+            raise xmlrpc.Fault(106, "Error in peering_all_hosts({},{})".format(key, please))
+
+    @withRequest
+    @inlineCallbacks
+    def xmlrpc_peering_all_reports_for_host(self, request, key, host):
+        try:
+            logging.info("peering_all_reports_for_hos({}, {})".format(key, host))
+            key = key.decode('hex')
+            host = host.decode('base64')
+            result = yield peering.handle_all_reports_for_host(key, host)
+            returnValue(result)
+        except xmlrpc.Fault, e:
+            raise e
+        except Exception, e:
+            log.err(_why="Exception in peering_all_updates_for_host")
+            raise xmlrpc.Fault(107, "Error in peering_all_updates_for_host({},{})".format(key, host))
+
+    @withRequest
+    @inlineCallbacks
+    def xmlrpc_peering_dump_table(self, request, key, host):
+        try:
+            logging.info("peering_dump_table({}, {})".format(key, host))
+            key = key.decode('hex')
+            host = host.decode('base64')
+            result = yield peering.handle_dump_table(key, host)
+            returnValue(result)
+        except xmlrpc.Fault, e:
+            raise e
+        except Exception, e:
+            log.err(_why="Exception in peering_dump_table")
+            raise xmlrpc.Fault(106, "Error in peering_dump_table({},{})".format(key, host))
+
+    @withRequest
+    @inlineCallbacks
     def xmlrpc_list_peers(self, request, key, please):
         try:
             logging.info("Received list_peers call")
@@ -91,8 +151,8 @@ class Server(xmlrpc.XMLRPC):
         except xmlrpc.Fault, e:
             raise e
         except Exception, e:
-            log.err(_why="Exception in peering_update")
-            raise xmlrpc.Fault(106, "Error in peering_update({},{})".format(key, please))
+            log.err(_why="Exception in peering_list_peers")
+            raise xmlrpc.Fault(108, "Error in peering_list_peers({},{})".format(key, please))
         returnValue(0)
 
     @withRequest

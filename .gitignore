@@ -3,6 +3,8 @@
 .*.swp
 log.txt
 *.log
+*.conf
+*.key
 _trial_temp/
 build/
 dist/

@@ -233,6 +233,8 @@ def run_main():
         help="Purge ip address from both legacy and reported host lists. DO NOT USE WHEN DENYHOSTS-SERVER IS RUNNING!")
     parser.add_argument("--check-peers", action="store_true", 
         help="Check if all peers are responsive, and if they agree about the peer list")
+    parser.add_argument("--bootstrap-from-peer", action="store", metavar="PEER_URL",
+        help="First wipe database and then bootstrap database from peer. DO NOT USE WHEN DENYHOSTS-SERVER IS RUNNING!")
     parser.add_argument("-f", "--force", action='store_true',
         help="Do not ask for confirmation, execute action immediately")
     args = parser.parse_args()
@@ -260,6 +262,7 @@ def run_main():
         or args.purge_legacy_addresses
         or args.purge_reported_addresses
         or args.recreate_database
+        or args.bootstrap_from_peer
         or args.purge_ip is not None):
         print("WARNING: do not run this method when denyhosts-server is running.")
         reply = raw_input("Are you sure you want to continue (Y/N): ")
@@ -279,6 +282,10 @@ def run_main():
     if args.evolve_database:
         single_shot = True
         database.evolve_database().addCallbacks(stop_reactor, stop_reactor)
+
+    if args.bootstrap_from_peer:
+        single_shot = True
+        peering.bootstrap_from(args.bootstrap_from_peer).addCallbacks(stop_reactor, stop_reactor)
 
     if args.purge_legacy_addresses:
         single_shot = True

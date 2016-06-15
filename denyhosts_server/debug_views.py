@@ -65,7 +65,7 @@ class DebugServer(xmlrpc.XMLRPC):
     def random_ip_address(self):
         while True:
             ip = ".".join(map(str, (random.randint(0, 255) for _ in range(4))))
-            if self.server.is_valid_ip_address(ip):
+            if utils.is_valid_ip_address(ip):
                 return ip
         
     _crackers = []
@@ -86,7 +86,7 @@ class DebugServer(xmlrpc.XMLRPC):
             else:
                 cracker_ip = self.random_ip_address()
 
-            logging.debug("Adding report for {} from {}".format(cracker_ip, reporter))
+            logging.debug("Adding report for {} from {} at {}".format(cracker_ip, reporter, when))
 
             yield utils.wait_and_lock_host(cracker_ip)
             
@@ -108,7 +108,7 @@ class DebugServer(xmlrpc.XMLRPC):
 
     @inlineCallbacks
     def xmlrpc_get_cracker_info(self, ip):
-        if not self.server.is_valid_ip_address(ip):
+        if not utils.is_valid_ip_address(ip):
             logging.warning("Illegal host ip address {}".format(ip))
             raise xmlrpc.Fault(101, "Illegal IP address \"{}\".".format(ip))
         #logging.info("Getting info for cracker {}".format(ip_address))

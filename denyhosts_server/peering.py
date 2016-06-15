@@ -14,9 +14,11 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+from __future__ import print_function
 import logging
 import json
 import os.path
+import sys
 import xmlrpclib
 from xmlrpclib import ServerProxy
 
@@ -29,6 +31,9 @@ import libnacl.utils
 import __init__
 import config
 import controllers
+import database
+from models import Cracker, Report
+import utils
 
 _own_key = None
 
@@ -46,8 +51,11 @@ def send_update(client_ip, timestamp, hosts):
         crypted = _peer_boxes[peer].encrypt(data_json)
         base64 = crypted.encode('base64')
 
-        server = yield deferToThread(ServerProxy, peer)
-        yield deferToThread(server.peering_update, _own_key.pk.encode('hex'), base64)
+        try:
+            server = yield deferToThread(ServerProxy, peer)
+            yield deferToThread(server.peering_update, _own_key.pk.encode('hex'), base64)
+        except:
+            logging.warning("Unable to send update to peer {}".format(peer))
 
 def decrypt_message(peer_key, message):
     peer = None
@@ -74,6 +82,68 @@ def handle_update(peer_key, update):
 
     yield controllers.handle_report_from_client(client_ip, timestamp, hosts)
 
+@inlineCallbacks
+def handle_schema_version(peer_key, please):
+    data = decrypt_message(peer_key, please)
+
+    if data != "please":
+        logging.warning("Request for schema_version is something else than please: {}".format(data))
+        raise Exception("Illegal request {}".format(data))
+
+    schema_version = yield database.get_schema_version()
+
+    returnValue(schema_version)
+
+@inlineCallbacks
+def handle_all_hosts(peer_key, please):
+    data = decrypt_message(peer_key, please)
+
+    if data != "please":
+        logging.warning("Request for all_hosts is something else than please: {}".format(data))
+        raise Exception("Illegal request {}".format(data))
+
+    crackers = yield database.dump_crackers()
+
+    logging.debug("Sending addresses of {} crackers to peer".format(len(crackers)))
+    logging.debug("Crackers: ".format(crackers))
+    
+    returnValue(crackers)
+
+@inlineCallbacks
+def handle_all_reports_for_host(peer_key, host):
+    host = decrypt_message(peer_key, host)
+
+    logging.debug("peering.handle_all_reports_for_host({})".format(host))
+
+    if not utils.is_valid_ip_address(host):
+        logging.warning("Illegal IP address for all_reports_for_host: {}".format(host))
+        raise Exception("Illegal request {}".format(data))
+
+    reports = yield database.dump_reports_for_cracker(host)
+
+    if reports is None:
+        reports = []
+
+    #logging.debug("all_reports for {}: {}".format(host, reports))
+    returnValue(reports)
+
+@inlineCallbacks
+def handle_dump_table(peer_key, table):
+    table = decrypt_message(peer_key, table)
+
+    logging.debug("peering.handle_dump_table({})".format(table))
+
+    if table not in [ "info", "legacy", "history", "country_history" ]:
+        logging.warning("Illegal table for dump_table: {}".format(table))
+        raise Exception("Illegal request {}".format(table))
+
+    rows = yield database.dump_table(table)
+
+    if rows is None:
+        rows = []
+
+    returnValue(rows)
+
 def list_peers(peer_key, please):
     data = decrypt_message(peer_key, please)
 
@@ -88,6 +158,56 @@ def list_peers(peer_key, please):
                 for peer in config.peers
             }
     }
+
+@inlineCallbacks
+def bootstrap_from(peer_url):
+    crypted = _peer_boxes[peer_url].encrypt("please")
+    please_base64 = crypted.encode('base64')
+
+    server = yield deferToThread(ServerProxy, peer_url)
+    remote_schema = yield server.peering_schema_version(_own_key.pk.encode('hex'), please_base64)
+
+    print("Initializing database...")
+    yield database.clean_database()
+
+    local_schema = yield database.get_schema_version()
+
+    if remote_schema != local_schema:
+        raise Exception("Unable to bootstrap from {}: remote database schema version is {}, local {}".format(peer_url, remote_schema, local_schema))
+
+    logging.debug("Remote database schema: {}; local schema: {}".format(remote_schema, local_schema))
+
+    hosts = yield deferToThread(server.peering_all_hosts, _own_key.pk.encode('hex'), please_base64)
+
+    #logging.debug("Hosts from peer: {}".format(hosts))
+    print("Copying data of {} hosts from peer".format(len(hosts)), end="")
+
+    count = 0
+    for host in hosts:
+        if count%100 == 0:
+            print(".", end="")
+            sys.stdout.flush()
+        count += 1
+        yield database.bootstrap_cracker(host)
+
+        host_ip = host[1]
+
+        crypted = _peer_boxes[peer_url].encrypt(host_ip)
+        base64 = crypted.encode('base64')
+        response = yield deferToThread(server.peering_all_reports_for_host, _own_key.pk.encode('hex'), base64)
+        #logging.debug("All reports response: {}".format(response))
+
+        for r in response:
+            database.bootstrap_report(r)
+    print(" Done")
+
+    for table in [ "info", "legacy", "history", "country_history" ]:
+        print("Copying {} table from peer...".format(table))
+        crypted = _peer_boxes[peer_url].encrypt(table)
+        base64 = crypted.encode('base64')
+        rows = yield deferToThread(server.peering_dump_table, _own_key.pk.encode('hex'), base64)
+        for row in rows:
+            database.bootstrap_table(table, row)
 
 def load_keys():
     global _own_key
@@ -164,10 +284,5 @@ def check_peers():
         print("Inconsistent peer server configuration, check all configuration files!")
 
     return success
-
-        
-
-
-
 
 # vim: tabstop=8 expandtab shiftwidth=4 softtabstop=4

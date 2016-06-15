@@ -126,6 +126,11 @@ denial of service attacks. Peers will share reports by clients directly when
 received. If a peer is offline for a while, it will NOT receive the reports
 it missed.
 
+When you add a new peer, you can bootstrap its database from one of the existing
+peers using the `--bootstrap-from-peer`` option. Give the URL of the peer you
+want to bootstrap from as parameter. The bootstrap option is not very well
+optimized since it is not anticipated to be used very often.
+
 ## Links
 - [`denyhosts-server` project site](https://github.com/janpascal/denyhosts_sync)
 - [`denyhosts` project site](https://github.com/denyhosts/denyhosts)
