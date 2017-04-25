@@ -42,13 +42,18 @@ and to prevent a single point of failure
 - If you use a MySQL database, you need to install the appropriate Python
   library. possibly by running `pip install MySQL-python`. On Debian/Ubuntu,
   use `apt-get install python-mysqldb`.
+- If you're on a Debian, and possible also Ubuntu system, you'll make your life
+  easier when you install the some packages:
+  apt-get install python-dev python-pip python-setuptools libgeoip-dev \
+  geoip-database libpng-dev libxft-dev python-matplotlib python-twisted \
+  libsodium-dev libffi-dev yui-compressor
 
 ## Installation
-Run the following command: `sudo ./setup.py minify_js minify_css install`. This will download the
-needed Python libraries, minify the used JavaScript and CSS libraries, install the Python scripts 
-onto your system (usually in `/usr/local/lib/python2.7/dist-packages`), install the default configuration
-file in `/etc/denyhosts-server.conf` and the Python script
-`/usr/local/bin/denyhosts-server`.
+Run the following command: `sudo setup.py develop` to download the needed 
+Python libraries. Then run `sudo setup.py minify_js minify_css install` to
+minify the used JavaScript and CSS libraries, install the Python scripts 
+onto your system (usually in `/usr/local/lib/python2.7/dist-packages`) 
+and the Python script `/usr/local/bin/denyhosts-server`.
 
 ## Configuration
 Create the database and a database user with full rights to it. Copy the
