@@ -42,8 +42,8 @@ class Server(xmlrpc.XMLRPC):
     @inlineCallbacks
     def xmlrpc_add_hosts(self, request, hosts):
         try:
-            x_real_ip = request.received_headers.get("X-Real-IP")
-            remote_ip = x_real_ip or request.getClientIP()
+            x_real_ip = request.requestHeaders.getRawHeaders("X-Real-IP")
+            remote_ip = x_real_ip[0] if x_real_ip else request.getClientIP()
             now = time.time()
 
             logging.info("add_hosts({}) from {}".format(hosts, remote_ip))
@@ -66,8 +66,8 @@ class Server(xmlrpc.XMLRPC):
     @inlineCallbacks
     def xmlrpc_get_new_hosts(self, request, timestamp, threshold, hosts_added, resiliency):
         try:
-            x_real_ip = request.received_headers.get("X-Real-IP")
-            remote_ip = x_real_ip or request.getClientIP()
+            x_real_ip = request.requestHeaders.getRawHeaders("X-Real-IP")
+            remote_ip = x_real_ip[0] if x_real_ip else request.getClientIP()
 
             logging.debug("get_new_hosts({},{},{},{}) from {}".format(timestamp, threshold, 
                 hosts_added, resiliency, remote_ip))
