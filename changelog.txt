@@ -1,3 +1,7 @@
+Release 2.2.2 (2017-05-03)
+- Fix unit test
+- Fix crash when generating stats in certain cases
+
 Release 2.2.1 (2017-05-02)
 - Fix for for version of python-twister>=16.0
 - Update documentation
