@@ -18,10 +18,18 @@ def sleep(seconds):
     reactor.callLater(seconds, d.callback, seconds)
     return d
 
+class MockHeaders:
+    def __init__(self, ip):
+        self._ip = ip
+
+    def getRawHeaders(self,key):
+        return [self._ip,]
+
 class MockRequest:
     def __init__(self, ip):
         self._ip = ip
         self.received_headers = {}
+        self.requestHeaders = MockHeaders(ip)
 
     def getClientIP(self):
         return self._ip
