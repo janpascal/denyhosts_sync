@@ -334,7 +334,7 @@ def make_country_bargraph(txn):
     rows = txn.fetchall()
     if rows is None or len(rows)==0:
         return
-    total_reports = rows[0][0]
+    total_reports = int(rows[0][0])
     
     txn.execute(database.translate_query("""
         SELECT country, num_reports
