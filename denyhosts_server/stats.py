@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 # denyhosts sync server
-# Copyright (C) 2015 Jan-Pascal van Best <janpascal@vanbest.org>
+# Copyright (C) 2015-2017 Jan-Pascal van Best <janpascal@vanbest.org>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published
