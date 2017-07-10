@@ -120,8 +120,10 @@ def make_daily_graph(txn):
         ORDER BY first_report_time ASC
         """), (yesterday, yesterday, yesterday))
     rows = txn.fetchall()
+    no_data = False
     if not rows:
         logging.debug("No data for past 24 hours")
+        no_data = True
         rows = [(0,0)]
     #logging.debug("Daily: {}".format(rows))
     rows = insert_zeroes(rows, 24)
@@ -149,6 +151,9 @@ def make_daily_graph(txn):
     ax.plot(dd, p(xx), "b--")
     ax.set_ybound(lower=0)
     fig.autofmt_xdate()
+    if no_data:
+        fig.text(0.5, 0.5, "Not enough data", size="x-large", 
+        ha="center", va="center")
     fig.savefig(os.path.join(config.graph_dir, 'hourly.svg'))
     fig.clf()
     plt.close(fig)
@@ -166,19 +171,22 @@ def make_monthly_graph(txn):
         ORDER BY date ASC
         """), (dt_start,))
     rows = txn.fetchall()
+    no_data = False
     if rows is None or len(rows)==0:
-        return
-
-    (x,y) = zip(*rows)
+        no_data = True
+        x = [ today, ]
+        y = [ 0, ]
+    else:
+        (x,y) = zip(*rows)
 
     # calc the trendline
     x_num = mdates.date2num(x)
-    
-    z = numpy.polyfit(x_num, y, 1)
-    p = numpy.poly1d(z)
-    
-    xx = numpy.linspace(x_num.min(), x_num.max(), 100)
-    dd = mdates.num2date(xx)
+   
+    if not no_data:
+        z = numpy.polyfit(x_num, y, 1)
+        p = numpy.poly1d(z)
+        xx = numpy.linspace(x_num.min(), x_num.max(), 100)
+        dd = mdates.num2date(xx)
     
     fig = plt.figure()
     ax = fig.gca()
@@ -187,9 +195,13 @@ def make_monthly_graph(txn):
     ax.yaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(humanize_number))
     ax.set_title("Reports per day")
     ax.plot(x,y, linestyle='solid', marker='o', markerfacecolor='blue')
-    ax.plot(dd, p(xx),"b--")
+    if not no_data:
+        ax.plot(dd, p(xx),"b--")
     ax.set_ybound(lower=0)
     fig.autofmt_xdate()
+    if no_data:
+        fig.text(0.5, 0.5, "Not enough data", size="x-large", 
+        ha="center", va="center")
     fig.savefig(os.path.join(config.graph_dir, 'monthly.svg'))
     fig.clf()
     plt.close(fig)
@@ -209,28 +221,29 @@ def make_history_graph(txn):
     num_days = ( datetime.date.today() - dt_first ).days
     #logging.debug("First day in data set: {}".format(dt_first))
     #logging.debug("Number of days in data set: {}".format(num_days))
+    no_data = False
     if num_days == 0:
-        return
-
-    txn.execute(database.translate_query("""
-        SELECT date, num_reports
-        FROM history
-        ORDER BY date ASC
-        """))
-    rows = txn.fetchall()
-    if rows is None or len(rows)==0:
-        return
-
-    (x,y) = zip(*rows)
+        no_data = True
+        x = [ dt_first, ]
+        y = [ 0, ]
+    else:
+        txn.execute(database.translate_query("""
+            SELECT date, num_reports
+            FROM history
+            ORDER BY date ASC
+            """))
+        rows = txn.fetchall()
+        (x,y) = zip(*rows)
 
     # calc the trendline
     x_num = mdates.date2num(x)
-    
-    z = numpy.polyfit(x_num, y, 1)
-    p = numpy.poly1d(z)
-    
-    xx = numpy.linspace(x_num.min(), x_num.max(), 100)
-    dd = mdates.num2date(xx)
+   
+    if not no_data:
+        z = numpy.polyfit(x_num, y, 1)
+        p = numpy.poly1d(z)
+        
+        xx = numpy.linspace(x_num.min(), x_num.max(), 100)
+        dd = mdates.num2date(xx)
     
     fig = plt.figure()
     ax = fig.gca()
@@ -244,9 +257,14 @@ def make_history_graph(txn):
         ax.plot(x,y, linestyle='solid', marker='o', markerfacecolor='blue')
     else:
         ax.plot(x,y, linestyle='solid', marker='')
-    ax.plot(dd, p(xx),"b--")
+    if not no_data:
+        ax.plot(dd, p(xx),"b--")
     ax.set_ybound(lower=0)
     fig.autofmt_xdate()
+
+    if num_days == 0:
+        fig.text(0.50, 0.50, "Not enough data", size="x-large", ha="center", va="center")
+
     fig.savefig(os.path.join(config.graph_dir, 'history.svg'))
     fig.clf()
     plt.close(fig)
@@ -262,21 +280,19 @@ def make_contrib_graph(txn):
     if first_time is not None and len(first_time)>0 and first_time[0][0] is not None:
         dt_first = first_time[0][0]
     else:
-        dt_first= datetime.date.today()
+        dt_first = datetime.date.today()
     num_days = ( datetime.date.today() - dt_first ).days
     if num_days == 0:
-        return
-
-    txn.execute(database.translate_query("""
-        SELECT date, num_contributors
-        FROM history
-        ORDER BY date ASC
-        """))
-    rows = txn.fetchall()
-    if rows is None or len(rows)==0:
-        return
-
-    (x,y) = zip(*rows)
+        x = [dt_first, ]
+        y = [0, ]
+    else:
+        txn.execute(database.translate_query("""
+            SELECT date, num_contributors
+            FROM history
+            ORDER BY date ASC
+            """))
+        rows = txn.fetchall()
+        (x,y) = zip(*rows)
 
     fig = plt.figure()
     ax = fig.gca()
@@ -291,6 +307,8 @@ def make_contrib_graph(txn):
         ax.plot(x,y, linestyle='solid', marker='')
     ax.set_ybound(lower=0)
     fig.autofmt_xdate()
+    if num_days == 0:
+        fig.text(0.50, 0.50, "Not enough data", size="x-large", ha="center", va="center")
     fig.savefig(os.path.join(config.graph_dir, 'contrib.svg'))
     fig.clf()
     plt.close(fig)
@@ -332,23 +350,29 @@ def make_country_bargraph(txn):
         """)
 
     rows = txn.fetchall()
-    if rows is None or len(rows)==0:
-        return
-    total_reports = int(rows[0][0])
-    
-    txn.execute(database.translate_query("""
-        SELECT country, num_reports
-        FROM country_history
-        ORDER BY num_reports DESC
-        LIMIT ?
-        """),(limit,))
+    no_data = False
+    if rows is None or len(rows)==0 or rows[0] is None or rows[0][0] is None:
+        no_data = True
+        total_reports = 1
+        countries = ["Unknown",]
+        counts = [1,]
+        max_count = 1
+    else:
+        total_reports = int(rows[0][0])
+        
+        txn.execute(database.translate_query("""
+            SELECT country, num_reports
+            FROM country_history
+            ORDER BY num_reports DESC
+            LIMIT ?
+            """),(limit,))
 
-    rows = txn.fetchall()
-    if rows is None or len(rows)==0:
-        return
+        rows = txn.fetchall()
+        if rows is None or len(rows)==0:
+            return
 
-    (countries,counts) = zip(*reversed(rows))
-    max_count = max(counts)
+        (countries,counts) = zip(*reversed(rows))
+        max_count = max(counts)
 
     fig = plt.figure()
     ax = fig.add_subplot(111)
@@ -368,6 +392,8 @@ def make_country_bargraph(txn):
     ax.xaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(humanize_number))
     ax.set_ylim(ymin=-1)
     fig.tight_layout()
+    if no_data:
+        fig.text(0.50, 0.50, "Not enough data", size="x-large", ha="center", va="center")
 
     fig.savefig(os.path.join(config.graph_dir, 'country_bar.svg'))
     fig.clf()
@@ -425,12 +451,11 @@ def update_stats_cache():
         logging.info("Stats: {} reports for {} hosts from {} reporters".format(
             stats["num_reports"], stats["num_hosts"], stats["num_clients"]))
 
-        if stats["num_reports"] > 0:
-            yield Registry.DBPOOL.runInteraction(make_daily_graph)
-            yield Registry.DBPOOL.runInteraction(make_monthly_graph)
-            yield Registry.DBPOOL.runInteraction(make_contrib_graph)
-            yield Registry.DBPOOL.runInteraction(make_history_graph)
-            yield Registry.DBPOOL.runInteraction(make_country_bargraph)
+        yield Registry.DBPOOL.runInteraction(make_daily_graph)
+        yield Registry.DBPOOL.runInteraction(make_monthly_graph)
+        yield Registry.DBPOOL.runInteraction(make_contrib_graph)
+        yield Registry.DBPOOL.runInteraction(make_history_graph)
+        yield Registry.DBPOOL.runInteraction(make_country_bargraph)
 
         if _cache is None:
             _cache = {}
@@ -605,8 +630,6 @@ def update_country_history_txn(txn, date=None, include_history = False):
             except Exception, e:
                 logging.debug("Exception looking up country for {}: {}".format(ip, e))
      
-    logging.debug("result: ".format(result))
-
     for country_code in result:
         country,count = result[country_code]
         txn.execute(database.translate_query(
