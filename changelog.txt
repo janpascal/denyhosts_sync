@@ -1,3 +1,6 @@
+Release 2.2.3 (2017-07-10)
+- Generate graph even if no data, with banner saying 'not enough data'
+
 Release 2.2.2 (2017-05-03)
 - Fix unit test
 - Fix crash when generating stats in certain cases
