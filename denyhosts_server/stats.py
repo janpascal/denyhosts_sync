@@ -423,7 +423,7 @@ def update_stats_cache():
     stats["has_hostnames"] = config.stats_resolve_hostnames
     # Note paths configured in main.py by the Resource objects
     stats["static_base"] = "../static"
-    stats["graph_base"] = "../static/graphs"
+    stats["graph_base"] = "../static/graph"
     stats["server_version"] = __init__.version
     try:
         #rows = yield database.run_query("SELECT num_hosts,num_reports, num_clients, new_hosts FROM stats ORDER BY time DESC LIMIT 1")
