@@ -1,0 +1,3 @@
+/var/lib/denyhosts-server/static/graph
+/var/www/sites/denyhosts-server
+/var/log/denyhosts-server

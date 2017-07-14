@@ -1,0 +1,27 @@
+#!/bin/sh
+# postrm script for denyhosts
+
+set -e
+
+case "$1" in
+    purge)
+        rm -fr /var/log/denyhosts-server
+        rm -fr /var/lib/denyhosts-server
+        deluser denyhosts-server || true
+        deluser --group --only-if-empty denyhosts || true
+        service nginx reload || true
+        rm -rf /var/www/sites/denyhosts-server
+        ;;
+
+    remove|upgrade|failed-upgrade|abort-install|abort-upgrade|disappear)
+	;;
+
+    *)
+        echo "postrm called with unknown argument \`$1'" >&2
+        exit 1
+
+esac
+
+#DEBHELPER#
+
+exit 0

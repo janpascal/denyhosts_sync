@@ -1,0 +1,6 @@
+LICENSE.md
+README.md
+changelog.txt
+denyhosts-server.conf.example
+denyhosts-server.init.example
+denyhosts-server.service.example

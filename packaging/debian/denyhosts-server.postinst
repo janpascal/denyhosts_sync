@@ -1,0 +1,55 @@
+#!/bin/sh
+
+set -e
+
+CNF=/etc/denyhosts-server.conf
+WD=/var/lib/denyhosts-server
+# denyhosts-server user
+DSU=denyhosts-server
+DSG=denyhosts
+DAEMON=/usr/sbin/denyhosts-server
+
+case "$1" in
+	configure)
+        if [ -z "$2" ]; then
+    		echo ""
+	    	echo "Add user $DSU if not exists."
+
+            addgroup --system $DSG || true
+            adduser --system --no-create-home --home $WD \
+                    --ingroup $DSG --disabled-password --disabled-login --gecos /dev/null $DSU || true
+            usermod -aG www-data $DSU || true
+            # For init/upgrade db
+            usermod -s /bin/sh $DSU || true
+
+            chown -R $DSU:$DSG /var/log/denyhosts-server
+            chown -R $DSU:www-data /var/lib/denyhosts-server
+            chown -R $DSU:www-data /var/www/sites/denyhosts-server
+
+    		echo ""
+            service denyhosts-server stop || true
+	    	echo "Init denyhosts-server database."
+            su -c "cd $WD; $DAEMON -c $CNF --recreate-database --force" - $DSU
+    		echo ""
+        else
+            echo ""
+            echo "Upgrade denyhosts-server database."
+            service denyhosts-server stop || true
+            su -c "cd $WD; $DAEMON -c $CNF --evolve-database --force" - $DSU
+            echo ""
+        fi
+        service nginx reload || true
+    ;;
+
+    abort-upgrade|abort-remove|abort-deconfigure)
+    ;;
+
+    *)
+        echo "postinst called with unknown argument '$1'" >&2
+        exit 1
+    ;;
+esac
+
+#DEBHELPER#
+
+exit 0

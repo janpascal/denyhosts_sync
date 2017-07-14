@@ -1,0 +1,20 @@
+Source: denyhosts-server
+Section: net
+Priority: optional
+Maintainer: Jan-Pascal van Best <janpascal@vanbest.org>
+Uploaders: Sergey Dryabzhinsky <sergey.dryabzhinsky@gmail.com>
+Build-Depends: debhelper (>= 7.0.50~), python (>= 2.6.6-3~), dh-python | debhelper (>= 8), python-minify | python2.7-pip-minify | python2.6-pip-minify
+Standards-Version: 3.9.3
+Homepage: https://github.com/janpascal/denyhosts_sync.git
+
+Package: denyhosts-server
+Architecture: all
+Depends: lsb-base (>= 3.1-13), ${python:Depends}, ${misc:Depends},
+ python-twisted, python-ipaddr, python-jinja2, python-numpy, python-geoip,
+ python-matplotlib, python-twistar | python2.7-pip-twistar | python2.6-pip-twistar
+Recommends: nginx | nginx-light | nginx-hosting | nginx-full
+Description: denyhosts-server is a server for denyhosts clients
+ denyhosts-server is a server that allows denyhosts clients to share
+ blocked IP addresses. It is intended to be a drop-in replacement for
+ the service at xmlrpc.denyhosts.net that up to now has been provided
+ by the original author of denyhosts.
