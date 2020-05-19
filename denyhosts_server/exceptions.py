@@ -38,6 +38,9 @@ class GetNewHostsException(XMLRPCError):
 class UnknownCrackerException(XMLRPCError):
     code = 106
 
+class AccessDeniedException(XMLRPCError):
+    code = 107
+
 def register_exceptions():
     register_exception(IllegalIPAddressException, IllegalIPAddressException.code)
     register_exception(IllegalParametersException, IllegalParametersException.code)
@@ -45,4 +48,5 @@ def register_exceptions():
     register_exception(ErrorAddingHostsException, ErrorAddingHostsException.code)
     register_exception(GetNewHostsException, GetNewHostsException.code)
     register_exception(UnknownCrackerException, UnknownCrackerException.code)
+    register_exception(AccessDeniedException, AccessDeniedException.code)
 

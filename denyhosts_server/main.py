@@ -27,7 +27,7 @@ from aiohttp import web
 from tortoise import Tortoise
 
 import views
-import debug_views
+##import debug_views
 #import peering_views
 import models
 import controllers
@@ -139,25 +139,12 @@ async def start_listening():
     logging.debug("main.start_listening()")
 
     xmlrpc_app = web.Application()
-    xmlrpc_app.router.add_view('/RPC2', views.Server)
+    xmlrpc_app.router.add_view('/RPC2', views.AppView)
 
     runner = web.AppRunner(xmlrpc_app)
     await runner.setup()
     site = web.TCPSite(runner, port=config.xmlrpc_listen_port)
     await site.start()
-
-    if config.enable_debug_methods:
-        logging.info("Starting debug RPC server")
-
-        debug_app = web.Application()
-        debug_app.router.add_view('/RPC2', debug_views.DebugServer)
-
-        runner = web.AppRunner(debug_app)
-        await runner.setup()
-        site = web.TCPSite(runner, port=config.debug_listen_port)
-        await site.start()
-
-
 
 # wait for finish signal
 # TODO move somewhere else :)

@@ -115,8 +115,7 @@ def read_config(filename):
 
     max_reported_crackers = _getint(_config, "sync", "max_reported_crackers", 50)
     xmlrpc_listen_port = _getint(_config, "sync", "listen_port", 9911)
-    debug_listen_port = _getint(_config, "sync", "debug_port", None)
-    enable_debug_methods = debug_listen_port is not None
+    enable_debug_methods = _getboolean(_config, "sync", "enable_debug_methods", False)
     legacy_server = _get(_config, "sync", "legacy_server", None)
     legacy_frequency = _getint(_config, "sync", "legacy_frequency", 300)
     legacy_threshold = _getint(_config, "sync", "legacy_threshold", 10)

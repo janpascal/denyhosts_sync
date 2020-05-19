@@ -5,7 +5,6 @@ import sys
 
 
 server = 'http://localhost:9911'
-debug_server = 'http://localhost:9912'
 
 print(f"Connecting to server {server}")
 s = ServerProxy(server)
@@ -25,19 +24,16 @@ s.add_hosts(["69.192.72.155"])
 s.add_hosts(["69.192.72.156"])
 s.add_hosts(["69.192.72.157"])
 
-s_debug = ServerProxy(debug_server)
-
 #print("Concurrency testing...")
 #for i in range(0, 100):
 #    print("Running test {}".format(i))
-#    s_debug.test()
+#    s.debug_test()
 #    print("Running maintenance")
-#    s_debug.maintenance()
+#    s.debug_maintenance()
 #    #time.sleep(0.01)
 
-s_debug.test()
-s_debug.maintenance()
-
+s.debug_test()
+s.debug_maintenance()
 
 try:
     print(s.get_new_hosts("12312iasda", 1, ["69.192.72.150"], 60))
@@ -60,8 +56,9 @@ print(s.get_new_hosts(time.time()-3600, 1, ["69.192.72.154"], 60))
 
 # Add a host and check that it is returned as a cracker
 host = "69.192.72.159"
+s.debug_clear_ip(host)
 s.add_hosts([host])
-time.sleep(2)
+time.sleep(5)
 s.add_hosts([host])
 hosts = s.get_new_hosts(time.time()-3600, 1, [], 1)["hosts"]
 if host in hosts:
@@ -79,19 +76,19 @@ if False:
     print(s1.get_new_hosts(time.time()-3600, 1, ["69.192.72.154"], 60))
 
     print("peer0 all hosts:")
-    print(s_debug.list_all_hosts())
+    print(s.debug_list_all_hosts())
 
     print("peer1 all hosts:")
     print(s1.debug.list_all_hosts())
 
 print("All hosts:")
-print(s_debug.list_all_hosts())
+print(s.debug_list_all_hosts())
 
 # #print s.dump_database()
 # 
 print("Cracker info for 69.192.72.154:")
 try:
-    print(s_debug.get_cracker_info("69.192.72.154"))
+    print(s.debug_get_cracker_info("69.192.72.154"))
 except Exception as e:
-    print("Exception while getting all info for cracker: {e}")
+    print(f"Exception while getting all info for cracker: {e}")
  
