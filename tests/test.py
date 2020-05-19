@@ -1,70 +1,97 @@
-#!/usr/bin/env python
-import xmlrpclib
+#!/usr/bin/env python3
+from xmlrpc.client import ServerProxy, Fault
 import time
 import sys
 
 
 server = 'http://localhost:9911'
-print("Connecting to server {}".format(server))
-s = xmlrpclib.ServerProxy(server)
+debug_server = 'http://localhost:9912'
 
-#print s.add_hosts(["127.0.0.3"])
-#print s.add_hosts(["192.168.1.22"])
+print(f"Connecting to server {server}")
+s = ServerProxy(server)
+
+for illegal_ip in ["127.0.0.3", "192.168.1.22", "test4.example.org"]:
+    try:
+        print(s.add_hosts([illegal_ip]))
+    except Fault as e:
+        if e.faultCode == 104:
+            print(f"Successfully received Fault 104 when trying to add illegal IP address {illegal_ip}")
+        else:
+            raise e
+
 print("Adding one host (four times)")
-print s.add_hosts(["69.192.72.154"])
-print s.add_hosts(["69.192.72.155"])
-print s.add_hosts(["69.192.72.156"])
-print s.add_hosts(["69.192.72.157"])
+s.add_hosts(["69.192.72.154"])
+s.add_hosts(["69.192.72.155"])
+s.add_hosts(["69.192.72.156"])
+s.add_hosts(["69.192.72.157"])
 
-# Concurrency testing
+s_debug = ServerProxy(debug_server)
+
+#print("Concurrency testing...")
 #for i in range(0, 100):
 #    print("Running test {}".format(i))
-#    s.debug.test()
+#    s_debug.test()
 #    print("Running maintenance")
-#    s.debug.maintenance()
-#    time.sleep(5)
+#    s_debug.maintenance()
+#    #time.sleep(0.01)
 
-s.debug.test()
-s.debug.maintenance()
+s_debug.test()
+s_debug.maintenance()
 
-#print s.add_hosts(["test4.example.org"])
 
-#print("New crackers, resilience=3600") 
-#print s.get_new_hosts(time.time()-3600, 3, ["old.example.net"], 3600)
-#print("New crackers, resilience=60") 
-#print s.get_new_hosts(time.time()-3600, 3, ["old.example.net"], 60)
-#print("New crackers, resilience=60, min_reporters=2") 
-#print s.get_new_hosts(time.time()-3600, 2, ["old.example.net"], 60)
-#print("New crackers, resilience=60, min_reporters=1") 
-#print s.get_new_hosts(time.time()-3600, 1, ["old.example.net"], 60)
-print("Illegal arguments: ")
 try:
-    print s.get_new_hosts("12312iasda", 1, ["old.example.net"], 60)
-except Exception, e:
-    print(e)
+    print(s.get_new_hosts("12312iasda", 1, ["69.192.72.150"], 60))
+except Fault as e:
+    if e.faultCode == 102:
+        print(f"Successfully received Fault 102 when trying to get new hosts with illegal timestamp")
+    else:
+        raise e
+
+print("New crackers, resilience=3600") 
+print(s.get_new_hosts(time.time()-3600, 3, ["69.192.72.150"], 3600))
+print("New crackers, resilience=60") 
+print(s.get_new_hosts(time.time()-3600, 3, ["69.192.72.150"], 60))
+print("New crackers, resilience=60, min_reporters=2") 
+print(s.get_new_hosts(time.time()-3600, 2, ["69.192.72.150"], 60))
 print("New crackers, resilience=60, min_reporters=1") 
-print s.get_new_hosts(time.time()-3600, 1, ["69.192.72.154"], 60)
+print(s.get_new_hosts(time.time()-3600, 1, ["69.192.72.150"], 60))
+print("New crackers, resilience=60, min_reporters=1") 
+print(s.get_new_hosts(time.time()-3600, 1, ["69.192.72.154"], 60))
 
-peer1 = 'http://localhost:9921'
-print("Connecting to server {}".format(peer1))
-s1 = xmlrpclib.ServerProxy(peer1)
+# Add a host and check that it is returned as a cracker
+host = "69.192.72.159"
+s.add_hosts([host])
+time.sleep(2)
+s.add_hosts([host])
+hosts = s.get_new_hosts(time.time()-3600, 1, [], 1)["hosts"]
+if host in hosts:
+    print(f"Successfully registered {host} as a cracker!")
+else:
+    raise Exception(f"Failed to register {host} as a cracker")
 
-print("peer1 new crackers, resilience=60, min_reporters=1") 
-print s1.get_new_hosts(time.time()-3600, 1, ["69.192.72.154"], 60)
+if False:
+    # Peering tests
+    peer1 = 'http://localhost:9921'
+    print("Connecting to server {}".format(peer1))
+    s1 = ServerProxy(peer1)
 
-print("peer0 all hosts:")
-print s.debug.list_all_hosts()
+    print("peer1 new crackers, resilience=60, min_reporters=1") 
+    print(s1.get_new_hosts(time.time()-3600, 1, ["69.192.72.154"], 60))
 
-print("peer1 all hosts:")
-print s1.debug.list_all_hosts()
+    print("peer0 all hosts:")
+    print(s_debug.list_all_hosts())
 
-#print("All hosts:")
-#print s.list_all_hosts()
+    print("peer1 all hosts:")
+    print(s1.debug.list_all_hosts())
+
+print("All hosts:")
+print(s_debug.list_all_hosts())
+
 # #print s.dump_database()
 # 
-#print("Cracker info for 69.192.72.154:")
-#try:
-#    print s.get_cracker_info("69.192.72.154")
-#except Exception, e:
-#    print e
-# 
+print("Cracker info for 69.192.72.154:")
+try:
+    print(s_debug.get_cracker_info("69.192.72.154"))
+except Exception as e:
+    print("Exception while getting all info for cracker: {e}")
+ 

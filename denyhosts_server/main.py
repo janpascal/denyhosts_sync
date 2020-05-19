@@ -1,5 +1,7 @@
+#!/usr/bin/env python3
+
 # denyhosts sync server
-# Copyright (C) 2015-2016 Jan-Pascal van Best <janpascal@vanbest.org>
+# Copyright (C) 2015-2020 Jan-Pascal van Best <janpascal@vanbest.org>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published
@@ -15,31 +17,30 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import argparse
+import asyncio
 import logging
 import signal
 import sys
-import ConfigParser
+import configparser
 
-from twisted.web import server, resource, static
-from twisted.enterprise import adbapi
-from twisted.internet import task, reactor
-from twisted.internet.defer import inlineCallbacks, returnValue
-from twisted.python import log
-
-from twistar.registry import Registry
+from aiohttp import web
+from tortoise import Tortoise
 
 import views
 import debug_views
-import peering_views
+#import peering_views
 import models
 import controllers
 import config
 import database
-import stats
+import exceptions
+#import stats
 import utils
-import peering
+#import peering
 
 import __init__
+
+logger = logging.getLogger(__name__)
 
 def stop_reactor(value):
     print(value)
@@ -69,7 +70,8 @@ def sighup_handler(signum, frame):
 
     stop_listening().addCallback(lambda _: start_listening())
 
-@inlineCallbacks
+
+# TODO is this still necessary with aiohttp?
 def shutdown():
     global main_xmlrpc_handler
     global _xmlrpc_listener
@@ -80,7 +82,7 @@ def shutdown():
         print("Shutting down, hold on a moment...")
         yield stop_listening()
 
-# This doesn't work, site.session is always empty
+        # This doesn't work, site.session is always empty
         logging.info("Ports closed, waiting for current sessions to close...")
         logging.debug("Clients still connected: {}".format(len(site.sessions)))
         while not len(site.sessions)==0:
@@ -89,7 +91,7 @@ def shutdown():
 
         logging.info("No more sessions, waiting for locked hosts...")
         while not utils.none_waiting():
-            logging.info("Waiting to shut down, {} hosts still blocked".format(utils.count_waiting()))
+            logging.info("Waiting to shut down, {} hosts still locked".format(utils.count_waiting()))
             yield task.deferLater(reactor, 1, lambda _:0, 0)
             logging.debug("reactor.getDelayedCalls: {}".format([c.func for c in reactor.getDelayedCalls()]))
 
@@ -133,53 +135,79 @@ def stop_listening():
 
     return deferred
 
-def start_listening():
+async def start_listening():
     logging.debug("main.start_listening()")
-    global _xmlrpc_listener
-    global _xmlrpc_site
-    global _stats_listener
-    global main_xmlrpc_handler
 
-    # Configure web resources
-    main_xmlrpc_handler = views.Server()
-    stats_resource = views.WebResource()
-    web_static = static.File(config.static_dir)
-    static.File.contentTypes['.svg'] = 'image/svg+xml'
-    web_graphs = static.File(config.graph_dir)
+    xmlrpc_app = web.Application()
+    xmlrpc_app.router.add_view('/RPC2', views.Server)
 
-    # Roots
-    if config.stats_listen_port == config.xmlrpc_listen_port:
-        xmlrpc_root = stats_resource
-    else:
-        xmlrpc_root = resource.Resource()
-    stats_root = stats_resource
+    runner = web.AppRunner(xmlrpc_app)
+    await runner.setup()
+    site = web.TCPSite(runner, port=config.xmlrpc_listen_port)
+    await site.start()
 
-    # /RPC2
-    xmlrpc_root.putChild('RPC2', main_xmlrpc_handler)
-
-    # Peering handler
-    p = peering_views.PeeringServer(main_xmlrpc_handler)
-    main_xmlrpc_handler.putSubHandler('peering', p)
-
-    # xmlrpc debug handler
     if config.enable_debug_methods:
-        d = debug_views.DebugServer(main_xmlrpc_handler)
-        main_xmlrpc_handler.putSubHandler('debug', d)
+        logging.info("Starting debug RPC server")
 
-    # /static
-    stats_root.putChild('static', web_static)
-    # /static/graphs
-    web_static.putChild('graphs', web_graphs)
+        debug_app = web.Application()
+        debug_app.router.add_view('/RPC2', debug_views.DebugServer)
 
-    logging.info("Start listening on port {}".format(config.xmlrpc_listen_port))
-    _xmlrpc_site = server.Site(xmlrpc_root)
-    _xmlrpc_listener = reactor.listenTCP(config.xmlrpc_listen_port, _xmlrpc_site)
+        runner = web.AppRunner(debug_app)
+        await runner.setup()
+        site = web.TCPSite(runner, port=config.debug_listen_port)
+        await site.start()
 
-    if config.stats_listen_port == config.xmlrpc_listen_port:
-        _stats_listener = None
-    else:
-        logging.info("Start serving statistics on port {}".format(config.stats_listen_port))
-        _stats_listener = reactor.listenTCP(config.stats_listen_port, server.Site(stats_root))
+
+
+# wait for finish signal
+# TODO move somewhere else :)
+# await runner.cleanup()
+
+##    global _xmlrpc_listener
+##    global _xmlrpc_site
+##    global _stats_listener
+##    global main_xmlrpc_handler
+##
+##    # Configure web resources
+##    main_xmlrpc_handler = views.Server()
+##    stats_resource = views.WebResource()
+##    web_static = static.File(config.static_dir)
+##    static.File.contentTypes['.svg'] = 'image/svg+xml'
+##    web_graphs = static.File(config.graph_dir)
+##
+##    # Roots
+##    if config.stats_listen_port == config.xmlrpc_listen_port:
+##        xmlrpc_root = stats_resource
+##    else:
+##        xmlrpc_root = resource.Resource()
+##    stats_root = stats_resource
+##
+##    # /RPC2
+##    xmlrpc_root.putChild('RPC2', main_xmlrpc_handler)
+##
+##    # Peering handler
+##    p = peering_views.PeeringServer(main_xmlrpc_handler)
+##    main_xmlrpc_handler.putSubHandler('peering', p)
+##
+##    # xmlrpc debug handler
+##    if config.enable_debug_methods:
+##        d = debug_views.DebugServer(main_xmlrpc_handler)
+##        main_xmlrpc_handler.putSubHandler('debug', d)
+##
+##    # /static
+##    stats_root.putChild('static', web_static)
+##    # /static/graphs
+##    web_static.putChild('graphs', web_graphs)
+
+##    logging.info("Start listening on port {}".format(config.xmlrpc_listen_port))
+##    _xmlrpc_site = server.Site(xmlrpc_root)
+##    _xmlrpc_listener = reactor.listenTCP(config.xmlrpc_listen_port, _xmlrpc_site)
+##
+##    if config.stats_listen_port == config.xmlrpc_listen_port:
+##        _stats_listener = None
+##    else:
+##        logging.info("Start serving statistics on port {}".format(config.stats_listen_port))
+##        _stats_listener = reactor.listenTCP(config.stats_listen_port, server.Site(stats_root))
 
 maintenance_job = None
 legacy_sync_job = None
@@ -217,9 +245,83 @@ def configure_logging():
         format="%(asctime)s %(module)-8s %(levelname)-8s %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S")
 
-    # Collect Twisted log messages in Python logging system
-    observer = log.PythonLoggingObserver()
-    observer.start()
+async def main(args, config):
+    # TODO
+    #peering.load_keys()
+
+    #Registry.DBPOOL = adbapi.ConnectionPool(config.dbtype, **config.dbparams)
+    #Registry.register(models.Cracker, models.Report, models.Legacy)
+
+    
+    await Tortoise.init(
+        db_url='sqlite://db.sqlite3',
+        modules={'models': ['models']}
+    )
+
+    single_shot = False
+
+    if not args.force and (args.recreate_database
+        or args.evolve_database
+        or args.purge_reported_addresses
+        or args.recreate_database
+        or args.bootstrap_from_peer
+        or args.purge_ip is not None):
+        print("WARNING: do not run this method when denyhosts-server is running.")
+        reply = input("Are you sure you want to continue (Y/N): ")
+        if not reply.upper().startswith('Y'):
+            sys.exit()
+
+    if args.check_peers:
+        if peering.check_peers():
+            sys.exit(0)
+        else:
+            sys.exit(1)
+
+    if args.recreate_database:
+        single_shot = True
+        await database.clean_database()
+
+    if args.evolve_database:
+        single_shot = True
+        database.evolve_database().addCallbacks(stop_reactor, stop_reactor)
+
+    if args.bootstrap_from_peer:
+        single_shot = True
+        peering.bootstrap_from(args.bootstrap_from_peer).addCallbacks(stop_reactor, stop_reactor)
+
+    if args.purge_reported_addresses:
+        single_shot = True
+        await controllers.purge_reported_addresses()
+
+    if args.purge_ip is not None:
+        single_shot = True
+        await controllers.purge_ip(args.purge_ip)
+
+    if not single_shot:
+        logger.debug("Setting up SIGHUP handler")
+        signal.signal(signal.SIGHUP, sighup_handler)
+
+        try:
+            # logger.debug("Checking database version...")
+            # no evolutions in Tortoise-ORM yet
+            # await database.check_database_version()
+
+            # TODO check if this is necessary
+            # reactor.addSystemEventTrigger("before", "shutdown", shutdown)
+
+            await start_listening()
+
+            # Set up maintenance and legacy sync jobs
+            #schedule_jobs()
+
+            # Run forever
+            logger.info("Entering main loop")
+            while True:
+                await asyncio.sleep(0.1)
+        except:
+            logger.exception("Unexpected exception in main loop")
+
+    await Tortoise.close_connections()
 
 def run_main():
     global configfile
@@ -248,74 +350,18 @@ def run_main():
 
     try:
         config.read_config(args.config)
-    except ConfigParser.NoSectionError, e:
+    except configparser.NoSectionError as e:
         print("Error in reading the configuration file from \"{}\": {}.".format(args.config, e))
         print("Please review the configuration file. Look at the supplied denyhosts-server.conf.example for more information.")
         sys.exit()
 
     configure_logging()
+    exceptions.register_exceptions()
 
-    peering.load_keys()
+    asyncio.run(main(args, config))
 
-    Registry.DBPOOL = adbapi.ConnectionPool(config.dbtype, **config.dbparams)
-    Registry.register(models.Cracker, models.Report, models.Legacy)
 
-    single_shot = False
-
-    if not args.force and (args.recreate_database
-        or args.evolve_database
-        or args.purge_legacy_addresses
-        or args.purge_reported_addresses
-        or args.recreate_database
-        or args.bootstrap_from_peer
-        or args.purge_ip is not None):
-        print("WARNING: do not run this method when denyhosts-server is running.")
-        reply = raw_input("Are you sure you want to continue (Y/N): ")
-        if not reply.upper().startswith('Y'):
-            sys.exit()
-
-    if args.check_peers:
-        if peering.check_peers():
-            sys.exit(0)
-        else:
-            sys.exit(1)
-
-    if args.recreate_database:
-        single_shot = True
-        database.clean_database().addCallbacks(stop_reactor, stop_reactor)
-
-    if args.evolve_database:
-        single_shot = True
-        database.evolve_database().addCallbacks(stop_reactor, stop_reactor)
-
-    if args.bootstrap_from_peer:
-        single_shot = True
-        peering.bootstrap_from(args.bootstrap_from_peer).addCallbacks(stop_reactor, stop_reactor)
-
-    if args.purge_legacy_addresses:
-        single_shot = True
-        controllers.purge_legacy_addresses().addCallbacks(stop_reactor, stop_reactor)
-
-    if args.purge_reported_addresses:
-        single_shot = True
-        controllers.purge_reported_addresses().addCallbacks(stop_reactor, stop_reactor)
-
-    if args.purge_ip is not None:
-        single_shot = True
-        controllers.purge_ip(args.purge_ip).addCallbacks(stop_reactor, stop_reactor)
-
-    if not single_shot:
-        signal.signal(signal.SIGHUP, sighup_handler)
-        reactor.addSystemEventTrigger("after", "startup", database.check_database_version)
-        reactor.addSystemEventTrigger("before", "shutdown", shutdown)
-
-        start_listening()
-
-        # Set up maintenance and legacy sync jobs
-        schedule_jobs()
-
-    # Start reactor
-    logging.info("Starting denyhosts-server version {}".format(__init__.version))
-    reactor.run()
+if __name__ == "__main__":
+    run_main()
 
 # vim: tabstop=8 expandtab shiftwidth=4 softtabstop=4

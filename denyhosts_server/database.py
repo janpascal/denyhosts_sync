@@ -1,5 +1,5 @@
 #    denyhosts sync server
-#    Copyright (C) 2015 Jan-Pascal van Best <janpascal@vanbest.org>
+#    Copyright (C) 2015-2020 Jan-Pascal van Best <janpascal@vanbest.org>
 
 #    This program is free software: you can redistribute it and/or modify
 #    it under the terms of the GNU Affero General Public License as published
@@ -18,17 +18,17 @@ import logging
 import datetime
 import time
 
-from twistar.registry import Registry
-from twisted.internet.defer import inlineCallbacks, returnValue
-
-import GeoIP
+import tortoise
+from tortoise import Tortoise
 
 import config
-import stats
+import models
+#import stats
 
 _quiet = False
+logger = logging.getLogger(__name__)
 
-def _remove_tables(txn):
+async def _remove_tables():
     global _quiet
     if not _quiet: 
         print("Removing all data from database and removing tables")
@@ -205,41 +205,43 @@ def _evolve_database(txn):
 def evolve_database():
     return Registry.DBPOOL.runInteraction(_evolve_database)
 
-@inlineCallbacks
-def clean_database(quiet = False):
+
+async def clean_database(quiet = False):
     global _quiet
     _quiet = quiet
-    yield Registry.DBPOOL.runInteraction(_remove_tables)
-    yield Registry.DBPOOL.runInteraction(_evolve_database)
+    # TODO
+    # await _remove_tables()
+    # Generate the schema
+    await Tortoise.generate_schemas()
 
-@inlineCallbacks
-def get_schema_version():
+
+async def get_schema_version():
+    global _quiet
     try:
-        rows = yield Registry.DBPOOL.runQuery('SELECT `value` FROM `info` WHERE `key`="schema_version"')
-        if rows is not None:
-            current_version = int(rows[0][0])
-        else:
-            if not _quiet:
-                print("No schema version in database")
-            current_version = 0
+        item = await models.InfoItem.get(key = 'schema_version')
+
+        current_version = int(item.value)
+    except tortoise.exceptions.DoesNotExist:
+        if not _quiet:
+            print("No schema version in database")
+        current_version = 0
     except:
         current_version = 0
-    returnValue(current_version)
 
-@inlineCallbacks
-def check_database_version():
+    return current_version
+
+
+async def check_database_version():
     global _quiet
-    current_version = yield get_schema_version()
+    current_version = await get_schema_version()
 
     if current_version != _schema_version:
         logging.debug("Wrong database schema {}, expecting {}, exiting".format(current_version, _schema_version))
         if not _quiet:
             print("Wrong database schema {}, expecting {}, exiting".format(current_version, _schema_version))
-        from twisted.internet import reactor
-        reactor.stop()
+        raise Exception("Wrong database schema")
     else:
         logging.info("Database schema is up to date (version {})".format(current_version))
-        returnValue(current_version)
 
 # FIXME Not the proper way. What if there's a question mark somewhere
 # else in the query?
@@ -274,7 +276,7 @@ def run_truncate_query(table):
 def dump_crackers():
     return run_query("SELECT * FROM crackers")
 
-@inlineCallbacks
+
 def dump_table(table):
     rows = yield run_query("SELECT * FROM " + table)
 

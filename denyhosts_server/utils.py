@@ -1,5 +1,5 @@
 # denyhosts sync server
-# Copyright (C) 2015-2016 Jan-Pascal van Best <janpascal@vanbest.org>
+# Copyright (C) 2015-2020 Jan-Pascal van Best <janpascal@vanbest.org>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published
@@ -14,30 +14,31 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import asyncio
 import logging
-import ipaddr
+import ipaddress
 
-from twisted.internet.defer import inlineCallbacks, returnValue
-from twisted.internet import reactor, task
 
 _hosts_busy = set()
 
-@inlineCallbacks
-def wait_and_lock_host(host):
+
+async def wait_and_lock_host(host):
     try:
+        count = 0
         while host in _hosts_busy:
-            logging.debug("waiting to update host {}, {} blocked now".format(host, len(_hosts_busy)))
-            yield task.deferLater(reactor, 0.01, lambda _:0, 0)
+            if count % 100 == 0:
+                logging.debug("waiting to update host {}, {} blocked now".format(host, len(_hosts_busy)))
+            count += 1
+
+            await asyncio.sleep(0.01)
         _hosts_busy.add(host)
     except:
         logging.debug("Exception in locking {}".format(host), exc_info=True)
 
-    returnValue(0)
-
 def unlock_host(host):
     try:
         _hosts_busy.remove(host)
-        #logging.debug("host {} unlocked, {} blocked now".format(host, len(_hosts_busy)))
+        logging.debug("host {} unlocked, {} blocked now".format(host, len(_hosts_busy)))
     except:
         logging.debug("Exception in unlocking {}".format(host), exc_info=True)
 
@@ -49,7 +50,7 @@ def count_waiting():
 
 def is_valid_ip_address(ip_address):
     try:
-        ip = ipaddr.IPAddress(ip_address)
+        ip = ipaddress.ip_address(ip_address)
     except:
         return False
     if (ip.is_reserved or ip.is_private or ip.is_loopback or

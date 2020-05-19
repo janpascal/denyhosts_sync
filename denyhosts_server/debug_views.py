@@ -1,5 +1,5 @@
 #    denyhosts sync server
-#    Copyright (C) 2015 Jan-Pascal van Best <janpascal@vanbest.org>
+#    Copyright (C) 2015-2020 Jan-Pascal van Best <janpascal@vanbest.org>
 
 #    This program is free software: you can redistribute it and/or modify
 #    it under the terms of the GNU Affero General Public License as published
@@ -14,53 +14,56 @@
 #    You should have received a copy of the GNU Affero General Public License
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import asyncio
 import time
 import logging
 import random
 
-from twisted.web import xmlrpc 
-from twisted.web.xmlrpc import withRequest
-from twisted.internet.defer import inlineCallbacks, returnValue
-from twisted.internet import reactor
-import ipaddr
+from aiohttp import web
+from aiohttp_xmlrpc import handler
+import ipaddress
 
 import models
 from models import Cracker, Report
 import config
 import controllers
+from exceptions import *
 import utils
+import views
 
-class DebugServer(xmlrpc.XMLRPC):
+class DebugServer(handler.XMLRPCView):
     """
     Debug xmlrpc methods
     """
 
-    def __init__(self, server):
-        self.server = server
+    async def rpc_list_all_hosts(self):
+        crackers = await Cracker.all()
+        return [c.ip_address for c in crackers]
 
-    @inlineCallbacks
-    def xmlrpc_list_all_hosts(self):
-        crackers = yield Cracker.all()
-        returnValue([c.ip_address for c in crackers])
+    async def rpc_clear_all():
+        await controllers.purge_reported_addresses()
 
-    # Concurrency test. Remove before public installation!
-    @withRequest
-    def xmlrpc_test(self, request):
-        reactor.callLater(1, self.server.xmlrpc_add_hosts, request, ["1.1.1.1", "2.2.2.2"])
-        reactor.callLater(1, self.server.xmlrpc_add_hosts, request, ["1.1.1.1", "2.2.2.2"])
-        reactor.callLater(1, self.server.xmlrpc_add_hosts, request, ["1.1.1.1", "2.2.2.2"])
-        reactor.callLater(1, self.server.xmlrpc_add_hosts, request, ["1.1.1.1", "2.2.2.2"])
-        reactor.callLater(1, self.server.xmlrpc_add_hosts, request, ["1.1.1.1", "2.2.2.2"])
-        reactor.callLater(1, self.server.xmlrpc_add_hosts, request, ["1.1.1.7", "2.2.2.8"])
-        reactor.callLater(1, self.server.xmlrpc_add_hosts, request, ["1.1.1.7", "2.2.2.8"])
-        reactor.callLater(1, self.server.xmlrpc_add_hosts, request, ["1.1.1.7", "2.2.2.8"])
-        reactor.callLater(1, self.server.xmlrpc_add_hosts, request, ["1.1.1.7", "2.2.2.8"])
-        reactor.callLater(1, self.server.xmlrpc_add_hosts, request, ["1.1.1.7", "2.2.2.8"])
-        return 0
+    # Concurrency test. 
+    async def rpc_test(self):
+        remote_ip = self.request.remote
+        for hosts in [ 
+            ["1.1.1.1", "2.2.2.2"],
+            ["1.1.1.7", "2.2.2.8"]
+            ]: 
+            for i in range(5):
+                now = time.time()
+                task = asyncio.create_task(controllers.handle_report_from_client(remote_ip, now, hosts))
+
+                def callback(future):
+                    try:
+                        _ = future.result()
+                    except Exception as e:
+                        logger.exception("Task in DebugServer.rpc_test() raised an exception!")
+                task.add_done_callback(callback)
 
     # For concurrency testing. Remove before public installation!
-    def xmlrpc_maintenance(self):
-        return controllers.perform_maintenance()
+    async def rpc_maintenance(self):
+        await controllers.perform_maintenance()
 
     def random_ip_address(self):
         while True:
@@ -69,8 +72,8 @@ class DebugServer(xmlrpc.XMLRPC):
                 return ip
         
     _crackers = []
-    @inlineCallbacks
-    def xmlrpc_test_bulk_insert(self, count, same_crackers = False, when=None):
+    
+    async def rpc_test_bulk_insert(self, count, same_crackers = False, when=None):
         if same_crackers and len(self._crackers) < count:
             logging.debug("Filling static crackers from {} to {}".format(len(self._crackers), count))
             for i in xrange(len(self._crackers), count):
@@ -88,40 +91,38 @@ class DebugServer(xmlrpc.XMLRPC):
 
             logging.debug("Adding report for {} from {} at {}".format(cracker_ip, reporter, when))
 
-            yield utils.wait_and_lock_host(cracker_ip)
+            await utils.wait_and_lock_host(cracker_ip)
             
-            cracker = yield Cracker.find(where=['ip_address=?', cracker_ip], limit=1)
+            cracker = await Cracker.find(where=['ip_address=?', cracker_ip], limit=1)
             if cracker is None:
                 cracker = Cracker(ip_address=cracker_ip, first_time=when, latest_time=when, total_reports=0, current_reports=0)
-                yield cracker.save()
-            yield controllers.add_report_to_cracker(cracker, reporter, when=when)
+                await cracker.save()
+            await controllers.add_report_to_cracker(cracker, reporter, when=when)
             
             utils.unlock_host(cracker_ip)
             logging.debug("Done adding report for {} from {}".format(cracker_ip,reporter))
-        total = yield Cracker.count()
-        total_reports = yield Report.count()
+        total = await Cracker.count()
+        total_reports = await Report.count()
         returnValue((total,total_reports))
 
-    def xmlrpc_clear_bulk_cracker_list(self):
+    async def rpc_clear_bulk_cracker_list(self):
         self._crackers = []
-        return 0
-
-    @inlineCallbacks
-    def xmlrpc_get_cracker_info(self, ip):
+    
+    async def rpc_get_cracker_info(self, ip):
         if not utils.is_valid_ip_address(ip):
             logging.warning("Illegal host ip address {}".format(ip))
             raise xmlrpc.Fault(101, "Illegal IP address \"{}\".".format(ip))
-        #logging.info("Getting info for cracker {}".format(ip_address))
-        cracker = yield controllers.get_cracker(ip)
+        #logging.info("Getting info for cracker {}".format(ip))
+        cracker = await Cracker.get(ip_address=ip)
         if cracker is None:
-            raise xmlrpc.Fault(104, "Cracker {} unknown".format(ip))
-            returnValue([])
+            raise UnknownCrackerException("Cracker {} unknown".format(ip))
 
         #logging.info("found cracker: {}".format(cracker))
-        reports = yield cracker.reports.get()
-        #logging.info("found reports: {}".format(reports))
+        #reports = await cracker.reports.all()
+        ##logging.info("found reports: {}".format(reports))
         cracker_cols=['ip_address','first_time', 'latest_time', 'resiliency', 'total_reports', 'current_reports']
         report_cols=['ip_address','first_report_time', 'latest_report_time']
-        returnValue( [cracker.toHash(cracker_cols), [r.toHash(report_cols) for r in reports]] )
+        return [(await Cracker.filter(ip_address=ip).values())[0], await
+                cracker.reports.all().values()] 
 
 # vim: tabstop=8 expandtab shiftwidth=4 softtabstop=4

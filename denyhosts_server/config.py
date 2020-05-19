@@ -14,7 +14,7 @@
 #    You should have received a copy of the GNU Affero General Public License
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import ConfigParser
+import configparser
 import inspect
 import logging
 import os.path
@@ -24,14 +24,14 @@ import sqlite3
 def _get(config, section, option, default=None):
     try:
         result = config.get(section, option)
-    except ConfigParser.NoOptionError:
+    except configparser.NoOptionError:
         result = default
     return result
 
 def _gethex(config, section, option, default=None):
     try:
         result = config.get(section, option)
-    except ConfigParser.NoOptionError:
+    except configparser.NoOptionError:
         result = default
     if result is not None:
         result = result.decode('hex')
@@ -40,21 +40,21 @@ def _gethex(config, section, option, default=None):
 def _getint(config, section, option, default=None):
     try:
         result = config.getint(section, option)
-    except ConfigParser.NoOptionError:
+    except configparser.NoOptionError:
         result = default
     return result
 
 def _getboolean(config, section, option, default=None):
     try:
         result = config.getboolean(section, option)
-    except ConfigParser.NoOptionError:
+    except configparser.NoOptionError:
         result = default
     return result
 
 def _getfloat(config, section, option, default=None):
     try:
         result = config.getfloat(section, option)
-    except ConfigParser.NoOptionError:
+    except configparser.NoOptionError:
         result = default
     return result
 
@@ -65,6 +65,7 @@ def read_config(filename):
     global logfile
     global loglevel
     global xmlrpc_listen_port
+    global debug_listen_port
     global legacy_server
     global legacy_frequency
     global legacy_threshold, legacy_resiliency
@@ -75,7 +76,7 @@ def read_config(filename):
     global static_dir, graph_dir, template_dir
     global key_file, peers
 
-    _config = ConfigParser.SafeConfigParser()
+    _config = configparser.SafeConfigParser()
     _config.readfp(open(filename,'r'))
 
     dbtype = _get(_config, "database", "type", "sqlite3")
@@ -114,7 +115,8 @@ def read_config(filename):
 
     max_reported_crackers = _getint(_config, "sync", "max_reported_crackers", 50)
     xmlrpc_listen_port = _getint(_config, "sync", "listen_port", 9911)
-    enable_debug_methods = _getboolean(_config, "sync", "enable_debug_methods", False)
+    debug_listen_port = _getint(_config, "sync", "debug_port", None)
+    enable_debug_methods = debug_listen_port is not None
     legacy_server = _get(_config, "sync", "legacy_server", None)
     legacy_frequency = _getint(_config, "sync", "legacy_frequency", 300)
     legacy_threshold = _getint(_config, "sync", "legacy_threshold", 10)
