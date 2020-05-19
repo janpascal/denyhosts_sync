@@ -1,13 +1,16 @@
-#!/usr/bin/env python
-import xmlrpclib
+#!/usr/bin/env python3
+
+from xmlrpc.client import ServerProxy
 import time
 import threading
 import random
-import ipaddr
+import ipaddress
+
+server = 'http://localhost:9911'
 
 def is_valid_ip_address(ip_address):
     try:
-        ip = ipaddr.IPAddress(ip_address)
+        ip = ipaddress.ip_address(ip_address)
     except:
         return False
     if (ip.is_reserved or ip.is_private or ip.is_loopback or
@@ -22,18 +25,16 @@ def random_ip_address():
         if is_valid_ip_address(ip):
             return ip
 
-server = 'http://localhost:9911'
-
 def run(server, count):
     # Assuming every client will supply 1 new host every 8minutes
     # and ask for newly recognised crackers
-    s = xmlrpclib.ServerProxy(server)
-    for i in xrange(count):
+    s = ServerProxy(server)
+    for i in range(count):
         ip = random_ip_address()
         try:
             s.add_hosts([ip])
             s.get_new_hosts(time.time()-480, 3, [ip], 3600)
-        except Exception, e:
+        except Exception as e:
             print("Got exception {}".format(e))
 
 def run_sim(server, num_threads, count):
@@ -41,16 +42,16 @@ def run_sim(server, num_threads, count):
 
     threads = []
     print("Creating threads...")
-    for i in xrange(num_threads):
+    for i in range(num_threads):
         thread = threading.Thread(target=run, args=(server, count))
         threads.append(thread)
 
     print("Starting threads...")
-    for i in xrange(num_threads):
+    for i in range(num_threads):
         threads[i].start()
 
     #print("Waiting for threads...")
-    for i in xrange(num_threads):
+    for i in range(num_threads):
         threads[i].join()
 
     end_time = time.time()
@@ -60,7 +61,6 @@ def run_sim(server, num_threads, count):
         count * num_threads / (end_time - start_time)))
 
 
-run_sim(server, 60, 100)
-
-
+if __name__ == "__main__":
+    run_sim(server, 60, 100)
 
