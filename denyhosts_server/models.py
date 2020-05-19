@@ -24,13 +24,13 @@ class InfoItem(Model):
     value = fields.TextField()
 
     class Meta:
-        table="info"    
+        table = "info"
 
 class Cracker(Model):
-    ip_address = fields.CharField(15)
-    first_time = fields.IntField()
+    ip_address = fields.CharField(15, unique=True)
+    first_time = fields.IntField(index=True)
     latest_time = fields.IntField()
-    resiliency = fields.IntField()
+    resiliency = fields.IntField(default=0)
     total_reports = fields.IntField()
     current_reports = fields.IntField()
 
@@ -38,20 +38,24 @@ class Cracker(Model):
         return "Cracker({},{},{},{},{},{})".format(self.id,self.ip_address,self.first_time,self.latest_time,self.resiliency,self.total_reports,self.current_reports)
 
     class Meta:
-        table="crackers"    
+        table = "crackers"
+        indexes = ( ("latest_time", "current_reports", "resiliency", "first_time"), )
 
 class Report(Model):
     cracker = fields.ForeignKeyField('models.Cracker', related_name='reports')
     ip_address = fields.CharField(15)
-    first_report_time = fields.IntField()
-    latest_report_time = fields.IntField()
+    first_report_time = fields.IntField(index=True)
+    latest_report_time = fields.IntField(index=True)
 
     def __str__(self):
         return "Report({},{},{},{})".format(self.id,self.ip_address,self.first_report_time,self.latest_report_time)
 
     class Meta:
-        table="reports"    
-
+        table = "reports"
+        indexes = ( 
+                ("cracker_id", "first_report_time"), 
+                ("cracker_id", "ip_address", "latest_report_time"),
+        ) 
 
 class HistoryItem(Model):
     date = fields.DateField()
@@ -60,15 +64,14 @@ class HistoryItem(Model):
     num_reported_hosts = fields.IntField()
 
     class Meta:
-        table="history"    
-
+        table = "history"
 
 class CountryHistoryItem(Model):
     country_code = fields.CharField(5, pk=True)
     country = fields.CharField(50)
-    num_reports = fields.IntField()
+    num_reports = fields.IntField(index=True)
 
     class Meta:
-        table="country_history"    
+        table = "country_history" 
 
 # vim: tabstop=8 expandtab shiftwidth=4 softtabstop=4
