@@ -22,6 +22,7 @@ import random
 from aiohttp import web
 from aiohttp_xmlrpc import handler
 import ipaddress
+from tortoise.exceptions import DoesNotExist
 
 import models
 from models import Cracker, Report
@@ -76,13 +77,13 @@ class DebugServer(handler.XMLRPCView):
     async def rpc_test_bulk_insert(self, count, same_crackers = False, when=None):
         if same_crackers and len(self._crackers) < count:
             logging.debug("Filling static crackers from {} to {}".format(len(self._crackers), count))
-            for i in xrange(len(self._crackers), count):
+            for i in range(len(self._crackers), count):
                 self._crackers.append(self.random_ip_address())
 
         if when is None:
             when = time.time()
 
-        for i in xrange(count):
+        for i in range(count):
             reporter = self.random_ip_address()
             if same_crackers:
                 cracker_ip = self._crackers[i]
@@ -92,18 +93,20 @@ class DebugServer(handler.XMLRPCView):
             logging.debug("Adding report for {} from {} at {}".format(cracker_ip, reporter, when))
 
             await utils.wait_and_lock_host(cracker_ip)
-            
-            cracker = await Cracker.find(where=['ip_address=?', cracker_ip], limit=1)
-            if cracker is None:
-                cracker = Cracker(ip_address=cracker_ip, first_time=when, latest_time=when, total_reports=0, current_reports=0)
-                await cracker.save()
-            await controllers.add_report_to_cracker(cracker, reporter, when=when)
-            
-            utils.unlock_host(cracker_ip)
+            try:
+                try:
+                    cracker = await Cracker.get(ip_address=cracker_ip)
+                except DoesNotExist:
+                    cracker = Cracker(ip_address=cracker_ip, first_time=when,
+                            latest_time=when, resiliency=0, total_reports=0, current_reports=0)
+                    await cracker.save()
+                await controllers.add_report_to_cracker(cracker, reporter, when=when)
+            finally:
+                utils.unlock_host(cracker_ip)
             logging.debug("Done adding report for {} from {}".format(cracker_ip,reporter))
-        total = await Cracker.count()
-        total_reports = await Report.count()
-        returnValue((total,total_reports))
+        total = await Cracker.all().count()
+        total_reports = await Report.all().count()
+        return (total,total_reports)
 
     async def rpc_clear_bulk_cracker_list(self):
         self._crackers = []
@@ -113,8 +116,9 @@ class DebugServer(handler.XMLRPCView):
             logging.warning("Illegal host ip address {}".format(ip))
             raise xmlrpc.Fault(101, "Illegal IP address \"{}\".".format(ip))
         #logging.info("Getting info for cracker {}".format(ip))
-        cracker = await Cracker.get(ip_address=ip)
-        if cracker is None:
+        try:
+            cracker = await Cracker.get(ip_address=ip)
+        except DoesNotExist:
             raise UnknownCrackerException("Cracker {} unknown".format(ip))
 
         #logging.info("found cracker: {}".format(cracker))

@@ -17,6 +17,8 @@
 import logging
 import time
 
+from tortoise.exceptions import DoesNotExist
+
 import config
 import database
 import models
@@ -38,8 +40,9 @@ async def handle_report_from_client(client_ip, timestamp, hosts):
         logging.debug("Adding report for {} from {}".format(cracker_ip, client_ip))
         await utils.wait_and_lock_host(cracker_ip)
         try:
-            cracker = await Cracker.get_or_none(ip_address=cracker_ip)
-            if cracker is None:
+            try:
+                cracker = await Cracker.get(ip_address=cracker_ip)
+            except DoesNotExist:
                 cracker = Cracker(ip_address=cracker_ip, first_time=timestamp,
                     latest_time=timestamp, resiliency=0, total_reports=0, current_reports=0)
                 await cracker.save()
