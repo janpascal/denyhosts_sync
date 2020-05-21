@@ -1,3 +1,4 @@
+import asyncio
 import time
 
 from denyhosts_server import models
@@ -5,59 +6,33 @@ from denyhosts_server import controllers
 from denyhosts_server import views 
 from denyhosts_server.models import Cracker, Report
 
-from twisted.internet import reactor,defer,task
-from twisted.internet.defer import inlineCallbacks, returnValue
-
-import base
-
 def random_ip_address():
     return ".".join(map(str, (random.randint(0, 255) for _ in range(4))))
 
-def sleep(seconds):
-    d = defer.Deferred()
-    reactor.callLater(seconds, d.callback, seconds)
-    return d
-
-class MockHeaders:
-    def __init__(self, ip):
-        self._ip = ip
-
-    def getRawHeaders(self,key):
-        return [self._ip,]
-
 class MockRequest:
     def __init__(self, ip):
-        self._ip = ip
-        self.received_headers = {}
-        self.requestHeaders = MockHeaders(ip)
+        self.remote = ip
+        self.headers = {}
 
     def getClientIP(self):
         return self._ip
 
-class ConcurrencyTest(base.TestBase):
+    
+async def test_try_and_confuse_server():
+    request = MockRequest("127.0.0.1")
+    view = views.AppView(request)
+    for i in range(0, 25):
+        print("count:{}".format(i))
 
-    @inlineCallbacks
-    def test_try_and_confuse_server(self):
-        self.view = views.Server()
-        request = MockRequest("127.0.0.1")
-        for i in range(0, 25):
-            print("count:{}".format(i))
+        tasks = []
+        for t in range(5):
+            tasks.append(asyncio.create_task(view.rpc_add_hosts(["1.1.1.1", "2.2.2.2"])))
+        for t in range(5):
+            tasks.append(asyncio.create_task(view.rpc_add_hosts(["1.1.1.7", "2.2.2.8"])))
+        tasks.append(controllers.perform_maintenance())
+        
+        await asyncio.gather(*tasks)
 
-            self.count = 0
-            def called(result):
-                self.count += 1
-           
-            for t in range(5):
-                task.deferLater(reactor, 0.01, self.view.xmlrpc_add_hosts, request, ["1.1.1.1", "2.2.2.2"]).addCallback(called)
-                self.count -= 1
-            for t in range(5):
-                task.deferLater(reactor, 0.01, self.view.xmlrpc_add_hosts, request, ["1.1.1.7", "2.2.2.8"]).addCallback(called)
-                self.count -= 1
-            task.deferLater(reactor, 0.01, controllers.perform_maintenance).addCallback(called)
-            self.count -= 1
-            
-            while self.count < 0:
-                yield sleep(0.1)
 """"
     def run(self, count):
         for i in xrange(count):
@@ -68,7 +43,7 @@ class ConcurrencyTest(base.TestBase):
             except Exception, e:
                 print("Got exception {}".format(e))
 
-    @inlineCallbacks
+    
     def test_simulate_clients(self):
         num_threads = 20
         num_runs = 100

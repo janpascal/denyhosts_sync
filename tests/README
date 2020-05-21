@@ -1,10 +1,10 @@
 Run these tests from the project root directory using
  
-  $ trial tests
+  $ pytest-3 tests/test_*.py 
 
-Trial is the Twisted test runner. On Debian systems, it is part of the
-python-twisted-core package.
+pytest-3 is the standard Python 3 test runner. On Debian systems, it is part of the
+python3-pytest package.
 
-This directory also contains some scripts that are not unit test and cannot be
-run using trial: test.py, fill_database.py and sim_clients.py. The latter two
+This directory also contains some scripts that are not unit tests and cannot be
+run using pytest: test.py, fill_database.py and sim_clients.py. The latter two
 scripts are used for performance testing.

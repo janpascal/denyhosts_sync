@@ -1,5 +1,5 @@
 # denyhosts sync server
-# Copyright (C) 2015 Jan-Pascal van Best <janpascal@vanbest.org>
+# Copyright (C) 2015-2020 Jan-Pascal van Best <janpascal@vanbest.org>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published
@@ -21,59 +21,54 @@ from denyhosts_server import controllers
 from denyhosts_server import database
 from denyhosts_server.models import Cracker, Report
 
-from twisted.internet.defer import inlineCallbacks, returnValue
-
-import base
 import logging
 
-class GetNewHostsTest(base.TestBase):
+async def test_get_qualifying_crackers(rpc_client):
+    now = time.time()
+    c = await Cracker.create(ip_address="192.168.1.1", first_time=now, latest_time=now, total_reports=0, current_reports=0)
+    assert c is not None, "Should be able to create Cracker object"
 
-    @inlineCallbacks
-    def test_get_qualifying_crackers(self):
-        now = time.time()
-        c = yield Cracker(ip_address="192.168.1.1", first_time=now, latest_time=now, total_reports=0, current_reports=0).save()
+    # First test: cracker without reports should not be reported
+    hosts = await controllers.get_qualifying_crackers(1, 0, now, 50, [])
+    assert len(hosts) == 0, "Cracker without reports should not be returned"
 
-        # First test: cracker without reports should not be reported
-        hosts = yield controllers.get_qualifying_crackers(1, 0, now, 50, [])
-        self.assertEqual(len(hosts), 0, "Cracker without reports should not be returned")
+    client_ip = "1.1.1.1"
+    await controllers.add_report_to_cracker(c, client_ip, when=now)
+    
+    hosts = await controllers.get_qualifying_crackers(1, -1, now-1, 50, [])
+    assert len(hosts) == 1, "When one report, get_new_hosts with resilience <0 should return one host"
 
-        client_ip = "1.1.1.1"
-        yield controllers.add_report_to_cracker(c, client_ip, when=now)
-        
-        hosts = yield controllers.get_qualifying_crackers(1, -1, now-1, 50, [])
-        self.assertEqual(len(hosts), 1, "When one report, get_new_hosts with resilience <0 should return one host")
+    hosts = await controllers.get_qualifying_crackers(2, -1, now-1, 50, [])
+    assert len(hosts) == 0, "When one report, get_new_hosts with resilience 0 and threshold 2 should return empty list"
 
-        hosts = yield controllers.get_qualifying_crackers(2, -1, now-1, 50, [])
-        self.assertEqual(len(hosts), 0, "When one report, get_new_hosts with resilience 0 and threshold 2 should return empty list")
+    client_ip = "1.1.1.2"
+    await controllers.add_report_to_cracker(c, client_ip, when=now+3600)
 
-        client_ip = "1.1.1.2"
-        yield controllers.add_report_to_cracker(c, client_ip, when=now+3600)
+    hosts = await controllers.get_qualifying_crackers(2, 3500, now-1, 50, [])
+    assert len(hosts) == 1, "Two reports should result in a result"
 
-        hosts = yield controllers.get_qualifying_crackers(2, 3500, now-1, 50, [])
-        self.assertEqual(len(hosts), 1, "Two reports should result in a result")
+    hosts = await controllers.get_qualifying_crackers(2, 3500, now-1, 50, [c.ip_address])
+    assert len(hosts) == 0, "Two reports, remove reported host from list"
 
-        hosts = yield controllers.get_qualifying_crackers(2, 3500, now-1, 50, [c.ip_address])
-        self.assertEqual(len(hosts), 0, "Two reports, remove reported host from list")
+    hosts = await controllers.get_qualifying_crackers(3, 3500, now-1, 50, [])
+    assert len(hosts) == 0, "Two reports, asked for three"
 
-        hosts = yield controllers.get_qualifying_crackers(3, 3500, now-1, 50, [])
-        self.assertEqual(len(hosts), 0, "Two reports, asked for three")
+    hosts = await controllers.get_qualifying_crackers(2, 4000, now-1, 50, [])
+    assert len(hosts) == 0, "Two reports, not enough resiliency"
 
-        hosts = yield controllers.get_qualifying_crackers(2, 4000, now-1, 50, [])
-        self.assertEqual(len(hosts), 0, "Two reports, not enough resiliency")
+    logging.debug("Testing d2")
+    client_ip = "1.1.1.3"
+    await controllers.add_report_to_cracker(c, client_ip, when=now+7200)
 
-        logging.debug("Testing d2")
-        client_ip = "1.1.1.3"
-        yield controllers.add_report_to_cracker(c, client_ip, when=now+7200)
+    hosts = await controllers.get_qualifying_crackers(2, 3500, now+3601, 50, [])
+    assert len(hosts) == 0, "Condition (d2)"
 
-        hosts = yield controllers.get_qualifying_crackers(2, 3500, now+3601, 50, [])
-        self.assertEqual(len(hosts), 0, "Condition (d2)")
+    logging.debug("Testing d1")
+    client_ip = "1.1.1.3"
+    await controllers.add_report_to_cracker(c, client_ip, when=now+7200+24*3600+1)
 
-        logging.debug("Testing d1")
-        client_ip = "1.1.1.3"
-        yield controllers.add_report_to_cracker(c, client_ip, when=now+7200+24*3600+1)
+    hosts = await controllers.get_qualifying_crackers(2, 24*3600+1, now+3601, 50, [])
+    assert len(hosts) == 1, "Condition (d1)"
 
-        hosts = yield controllers.get_qualifying_crackers(2, 24*3600+1, now+3601, 50, [])
-        self.assertEqual(len(hosts), 1, "Condition (d1)")
-
-        
+    
 # vim: tabstop=8 expandtab shiftwidth=4 softtabstop=4
