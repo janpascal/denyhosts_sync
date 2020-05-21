@@ -230,11 +230,12 @@ async def purge_reported_addresses():
 
 
 async def purge_ip(ip):
-    #    await database.run_query("""DELETE FROM reports
-    #        WHERE cracker_id IN (
-    #            SELECT id FROM crackers WHERE ip_address=?
-    #            )""", ip)
-    await Reports.find(cracker__ip_address = ip).delete()
-    await Cracker.find(ip_address = ip).delete()
+    # Does not work, see https://github.com/tortoise/tortoise-orm/issues/283
+    # await Report.filter(cracker__ip_address = ip).delete()
+    reports = await Report.filter(cracker__ip_address = ip)
+    for report in reports:
+        await report.delete()
+
+    await Cracker.filter(ip_address = ip).delete()
 
 # vim: tabstop=8 expandtab shiftwidth=4 softtabstop=4
