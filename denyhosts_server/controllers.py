@@ -19,11 +19,11 @@ import time
 
 from tortoise.exceptions import DoesNotExist
 
-import config
-import database
-import models
-from models import Cracker, Report##, Legacy
-import utils
+from . import config
+from . import database
+from . import models
+from .models import Cracker, Report##, Legacy
+from . import utils
 
 logger = logging.getLogger(__name__)
 

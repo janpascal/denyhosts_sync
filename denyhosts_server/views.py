@@ -24,12 +24,12 @@ from aiohttp_xmlrpc import handler
 import ipaddress
 from tortoise.exceptions import DoesNotExist
 
-from exceptions import *
-import models
-from models import Cracker, Report
-import config
-import controllers
-import utils
+from .exceptions import *
+from . import models
+from .models import Cracker, Report
+from . import config
+from . import controllers
+from . import utils
 #import stats
 #import peering
 

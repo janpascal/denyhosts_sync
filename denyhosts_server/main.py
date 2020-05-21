@@ -26,19 +26,19 @@ import configparser
 from aiohttp import web
 from tortoise import Tortoise
 
-import views
+from . import views
 ##import debug_views
 #import peering_views
-import models
-import controllers
-import config
-import database
-import exceptions
+from . import models
+from . import controllers
+from . import config
+from . import database
+from . import exceptions
 #import stats
-import utils
+from . import utils
 #import peering
 
-import __init__
+from . import __init__
 
 logger = logging.getLogger(__name__)
 

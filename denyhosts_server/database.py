@@ -21,8 +21,8 @@ import time
 import tortoise
 from tortoise import Tortoise
 
-import config
-import models
+from . import config
+from . import models
 #import stats
 
 _quiet = False
