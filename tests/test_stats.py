@@ -21,116 +21,112 @@ import os.path
 import time
 import traceback
 
-from denyhosts_server.models import Cracker, Report, Legacy
+from denyhosts_server.models import Cracker, Report
 from denyhosts_server import config
 from denyhosts_server import controllers
 from denyhosts_server import stats
-
-from twisted.internet.defer import inlineCallbacks, returnValue
-
-from twistar.registry import Registry
-
-import base
-
-class StatsTest(base.TestBase):
-
-    @inlineCallbacks
-    def test_fixup(self):
-        now = time.time()
-        c1 = yield Cracker(ip_address="194.109.6.92", first_time=now, latest_time=now, total_reports=0, current_reports=0).save()
-        c2 = yield Cracker(ip_address="192.30.252.128", first_time=now, latest_time=now, total_reports=0, current_reports=0).save()
-
-        hosts = [c1, c2]
-        config.stats_resolve_hostnames = True
-        stats.fixup_crackers(hosts)
-
-        self.assertEqual(c1.hostname, "www.xs4all.nl", "Reverse DNS of www.xs4all.nl")
-        self.assertEqual(c1.country, "Netherlands", "Testing geoip of www.xs4all.nl")
-
-        self.assertEqual(c2.hostname, "github.com", "Reverse DNS of github.com")
-        self.assertEqual(c2.country, "United States", "Testing geoip of github.com")
-
-    def stats_settings(self):
-        tests_dir = os.path.dirname(inspect.getsourcefile(self.__class__))
-        package_dir = os.path.dirname(tests_dir)
-        config.static_dir = os.path.join(package_dir, "static")
-        config.template_dir = os.path.join(package_dir, "template")
-        config.graph_dir = os.path.join(os.getcwd(), "graph")
-        try:
-            os.mkdir(config.graph_dir)
-        except OSError:
-            pass
-        config.stats_resolve_hostnames = False
+from denyhosts_server import views
 
 
-    @inlineCallbacks
-    def prepare_stats(self):
-        self.stats_settings()
 
-        now = time.time()
-        c1 = yield Cracker(ip_address="192.168.1.1", first_time=now, latest_time=now, total_reports=0, current_reports=0).save()
-        c2 = yield Cracker(ip_address="192.168.1.2", first_time=now, latest_time=now, total_reports=0, current_reports=0).save()
+async def test_fixup():
+    now = time.time()
+    c1 = await Cracker.create(ip_address="194.109.6.92", first_time=now, latest_time=now, total_reports=0, current_reports=0)
+    c2 = await Cracker.create(ip_address="83.163.6.54", first_time=now, latest_time=now, total_reports=0, current_reports=0)
 
-        yield controllers.add_report_to_cracker(c1, "127.0.0.1", when=now-25*3600)
-        yield controllers.add_report_to_cracker(c1, "127.0.0.2", when=now)
-        yield controllers.add_report_to_cracker(c1, "127.0.0.3", when=now)
-        yield controllers.add_report_to_cracker(c2, "127.0.0.2", when=now)
-        yield controllers.add_report_to_cracker(c2, "127.0.0.3", when=now+1)
+    hosts = [c1, c2]
+    config.stats_resolve_hostnames = True
+    await stats.fixup_crackers(hosts)
 
-        yield Registry.DBPOOL.runInteraction(stats.fixup_history_txn)
-        yesterday = datetime.date.today() - datetime.timedelta(days=1)
-        yield Registry.DBPOOL.runInteraction(stats.update_country_history_txn, yesterday, include_history=True)
-        yield stats.update_stats_cache()
+    assert c1.hostname == "www.xs4all.nl", "Reverse DNS of www.xs4all.nl"
+    assert c1.country == "Netherlands", "Testing geoip of www.xs4all.nl"
 
-    @inlineCallbacks
-    def test_empty_state(self):
-        self.stats_settings()
+    assert c2.hostname == "vanbest.eu", "Reverse DNS of vanbest.eu"
+    assert c2.country == "Netherlands", "Testing geoip of vanbest.eu"
 
-        yield stats.update_stats_cache()
-        self.assertIsNotNone(stats._cache, "Stats for empty database should not be None")
+def stats_settings():
+    tests_dir = os.path.dirname(__file__)
+    package_dir = os.path.dirname(tests_dir)
+    config.static_dir = os.path.join(package_dir, "static")
+    config.template_dir = os.path.join(package_dir, "template")
+    config.graph_dir = os.path.join(os.getcwd(), "graph")
+    try:
+        os.mkdir(config.graph_dir)
+    except OSError:
+        pass
+    config.stats_resolve_hostnames = False
 
-        cached = stats._cache["stats"]
-        self.assertEqual(cached["num_hosts"], 0, "Number of hosts in empty database")
-        self.assertEqual(cached["num_reports"], 0, "Number of reports in empty database")
-        self.assertEqual(cached["num_clients"], 0, "Number of clients in empty database")
 
-        html = yield stats.render_stats()
-        #print(html)
-        self.assertTrue("Number of clients" in html, "HTML should contain number of clients")
-        self.assertTrue("../static/graphs/hourly.svg" in html, "HTML should contain path to hourly graph")
 
-    @inlineCallbacks
-    def test_stats_cache(self):
-        yield self.prepare_stats()
+async def prepare_stats():
+    stats_settings()
 
-        cached = stats._cache["stats"]
-        print(cached)
-        self.assertEqual(cached["num_hosts"], 2, "Number of hosts in database")
-        self.assertEqual(cached["num_reports"], 5, "Number of reports in database")
-        self.assertEqual(cached["num_clients"], 3, "Number of clients in database")
+    now = time.time()
+    c1 = await Cracker.create(ip_address="192.168.1.1", first_time=now, latest_time=now, total_reports=0, current_reports=0)
+    c2 = await Cracker.create(ip_address="192.168.1.2", first_time=now, latest_time=now, total_reports=0, current_reports=0)
 
-        self.assertEquals(cached["recent_hosts"][0].ip_address, "192.168.1.2", "Most recent host")
-        self.assertEquals(len(cached["recent_hosts"]), 2, "Reported both hosts in most recent list")
+    await controllers.add_report_to_cracker(c1, "127.0.0.1", when=now-25*3600)
+    await controllers.add_report_to_cracker(c1, "127.0.0.2", when=now)
+    await controllers.add_report_to_cracker(c1, "127.0.0.3", when=now)
+    await controllers.add_report_to_cracker(c2, "127.0.0.2", when=now)
+    await controllers.add_report_to_cracker(c2, "127.0.0.3", when=now+1)
 
-        self.assertEquals(cached["recent_hosts"][0].ip_address, "192.168.1.2", "Most recent host")
-        self.assertEquals(len(cached["recent_hosts"]), 2, "Reported both hosts in most recent list")
+    await stats.fixup_history()
+    yesterday = datetime.date.today() - datetime.timedelta(days=1)
+    await stats.update_country_history(yesterday, include_history=True)
+    await stats.update_stats_cache()
 
-        self.assertEquals(cached["most_reported_hosts"][0].ip_address, "192.168.1.1", "Most reported host") 
-        self.assertEquals(len(cached["most_reported_hosts"]), 2, "Reported both hosts in most reported list")
 
-        self.assertTrue(os.access(os.path.join(config.graph_dir, "hourly.svg"), os.R_OK), "Creation of hourly graph")
-        self.assertTrue(os.access(os.path.join(config.graph_dir, "monthly.svg"), os.R_OK), "Creation of monthly graph")
-        self.assertTrue(os.access(os.path.join(config.graph_dir, "contrib.svg"), os.R_OK), "Creation of contributors graph")
+async def test_empty_state(web_client):
+    stats_settings()
 
-    @inlineCallbacks
-    def test_stats_render(self):
-        yield self.prepare_stats()
+    await stats.update_stats_cache()
+    assert stats._cache != None, "Stats for empty database should not be None"
 
-        html = yield stats.render_stats()
-        #print(html)
-        self.assertTrue("Number of clients" in html, "HTML should contain number of clients")
-        self.assertTrue("../static/graphs/hourly.svg" in html, "HTML should contain path to hourly graph")
-        self.assertFalse("127.0.0.1" in html, "HTML should not contain reported ip addresses")
-        self.assertEqual(html.count("192.168.1.1"), 2, "HTML should contain ip address of hosts in tables")
+    cached = stats._cache["stats"]
+    assert cached["num_hosts"] == 0, "Number of hosts in empty database"
+    assert cached["num_reports"] == 0, "Number of reports in empty database"
+    assert cached["num_clients"] == 0, "Number of clients in empty database"
+
+    response = await web_client.get('/')
+    html = await response.text()
+    print(html)
+    assert "Number of clients" in html, "HTML should contain number of clients"
+    assert "../static/graphs/hourly.svg" in html, "HTML should contain path to hourly graph"
+
+
+async def test_stats_cache():
+    await prepare_stats()
+
+    cached = stats._cache["stats"]
+    #print(cached)
+    assert cached["num_hosts"] == 2, "Number of hosts in database"
+    assert cached["num_reports"] == 5, "Number of reports in database"
+    assert cached["num_clients"] == 3, "Number of clients in database"
+
+    assert cached["recent_hosts"][0].ip_address == "192.168.1.2", "Most recent host"
+    assert len(cached["recent_hosts"]) == 2, "Reported both hosts in most recent list"
+
+    assert cached["recent_hosts"][0].ip_address == "192.168.1.2", "Most recent host"
+    assert len(cached["recent_hosts"]) == 2, "Reported both hosts in most recent list"
+
+    assert cached["most_reported_hosts"][0].ip_address == "192.168.1.1", "Most reported host"
+    assert len(cached["most_reported_hosts"]) == 2, "Reported both hosts in most reported list"
+
+    assert os.access(os.path.join(config.graph_dir, "hourly.svg"), os.R_OK), "Creation of hourly graph"
+    assert os.access(os.path.join(config.graph_dir, "monthly.svg"), os.R_OK), "Creation of monthly graph"
+    assert os.access(os.path.join(config.graph_dir, "contrib.svg"), os.R_OK), "Creation of contributors graph"
+
+
+async def test_stats_render(web_client):
+    await prepare_stats()
+
+    response = await web_client.get('/')
+    html = await response.text()
+    #print(html)
+    assert "Number of clients" in html, "HTML should contain number of clients"
+    assert "../static/graphs/hourly.svg" in html, "HTML should contain path to hourly graph"
+    assert "127.0.0.1" not in html, "HTML should not contain reported ip addresses"
+    assert html.count("192.168.1.1") == 2, "HTML should contain ip address of hosts in tables"
 
 # vim: tabstop=8 expandtab shiftwidth=4 softtabstop=4

@@ -2,6 +2,8 @@ import os
 
 from aiohttp import web
 from aiohttp_xmlrpc.client import ServerProxy
+import aiohttp_jinja2
+import jinja2
 
 import pytest
 from tortoise.contrib.test import finalizer, initializer
@@ -9,6 +11,7 @@ from tortoise.contrib.test import finalizer, initializer
 from denyhosts_server import config
 from denyhosts_server import main
 from denyhosts_server import views
+from denyhosts_server import stats
 
 pytest_plugins = (
     'aiohttp.pytest_plugin',
@@ -36,6 +39,20 @@ async def rpc_client(aiohttp_client):
 
     client = ServerProxy('', test_client)
     print(f"client: {client} ({type(client)}")
+
+    return client
+
+@pytest.fixture
+async def web_client(aiohttp_client):
+    app = web.Application()
+    app.router.add_route('GET', '/', views.stats_view)
+    aiohttp_jinja2.setup(app,
+        loader=jinja2.FileSystemLoader(config.template_dir),
+        filters={
+            'datetime': stats.format_datetime
+            })
+
+    client = await aiohttp_client(app)
 
     return client
 

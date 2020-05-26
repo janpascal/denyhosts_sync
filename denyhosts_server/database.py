@@ -257,20 +257,23 @@ def translate_query(query):
             print("unsupported database {}".format(config.dbtype))
         return query
 
+def get_connection():
+    try:
+        return Tortoise.get_connection('default')
+    except KeyError:
+        from tortoise.contrib.test import _CONNECTIONS
+        return _CONNECTIONS['models']
+
 async def run_query(query, *args):
-    #logger.debug(f"Connections: {Tortoise._connections}")
-    #print(f"Connections: {Tortoise._connections}")
-    conn = Tortoise.get_connection('default')
+    conn = get_connection()
     return await conn.execute_query(translate_query(query), args)
 
 async def run_query_dict(query, *args):
-    #logger.debug(f"Connections: {Tortoise._connections}")
-    #print(f"Connections: {Tortoise._connections}")
-    conn = Tortoise.get_connection('default')
+    conn = get_connection()
     return await conn.execute_query_dict(translate_query(query), args)
 
 async def run_operation(query, *args):
-    conn = Tortoise.get_connection('default`')
+    conn = get_connection()
     await conn.execute_script(translate_query(query), args)
 
 async def run_truncate_query(table):
@@ -282,7 +285,7 @@ async def run_truncate_query(table):
     else:
         if not _quiet:
             print("unsupported database {}".format(config.dbtype))
-    conn = tortoise.get_connection('default')
+    conn = get_connection()
     num_rows, result = await conn.execute_query(translate_query(query), args)
     return num_rows
 
