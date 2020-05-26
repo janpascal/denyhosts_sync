@@ -5,13 +5,12 @@ import threading
 import random
 
 server = 'http://localhost:9911'
-debug_server = 'http://localhost:9912'
 
 def run(count, known_crackers):
     #print("Connecting to server {}".format(server))
     start_time = time.time()
-    s_debug = ServerProxy(debug_server)
-    s_debug.test_bulk_insert(count, known_crackers, start_time - random.random()*7*24*3600)
+    s = ServerProxy(server)
+    s.debug_test_bulk_insert(count, known_crackers, start_time - random.random()*7*24*3600)
     #print("Inserting {} hosts took {} seconds".format(count, time.time() - start_time))
 
 def run_insert_test(num_threads, count, known_crackers):
@@ -36,11 +35,10 @@ def run_insert_test(num_threads, count, known_crackers):
 
 
 s = ServerProxy(server)
-s_debug = ServerProxy(debug_server)
 
 for num_threads in range(20, 59):
     print("Inserting {} hosts {} times, please wait...".format(100, num_threads))
-    s_debug.clear_bulk_cracker_list()
+    s.debug_clear_bulk_cracker_list()
     run_insert_test(num_threads, 100, True)
     time.sleep(3)
 
