@@ -213,8 +213,7 @@ async def make_monthly_graph():
     fig.clf()
     plt.close(fig)
 
-async def make_history_graph():
-    # Graph since first record
+async def first_history_date():
     rows = await database.run_query_dict("""
         SELECT date FROM history 
         ORDER BY date ASC
@@ -224,9 +223,15 @@ async def make_history_graph():
         if isinstance(rows[0]['date'], str):
             dt_first = datetime.date.fromisoformat(rows[0]['date'])
         else:
-         dt_first = rows[0]['date']
+            dt_first = rows[0]['date']
     else:
-        dt_first= datetime.date.today()
+        dt_first = datetime.date.today()
+
+    return dt_first
+
+async def make_history_graph():
+    # Graph since first record
+    dt_first = await first_history_date()
     num_days = ( datetime.date.today() - dt_first ).days
     #logging.debug("First day in data set: {}".format(dt_first))
     #logging.debug("Number of days in data set: {}".format(num_days))
@@ -283,19 +288,9 @@ async def make_history_graph():
     plt.close(fig)
 
 async def make_contrib_graph():
+    dt_first = await first_history_date()
+
     # Number of reporters over days
-    rows = await database.run_query_dict("""
-        SELECT date FROM history 
-        ORDER BY date ASC
-        LIMIT 1
-        """)
-    if rows is not None and len(rows)>0 and rows[0]['date'] is not None:
-        if isinstance(rows[0]['date'], str):
-            dt_first = datetime.date.fromisoformat(rows[0]['date'])
-        else:
-            dt_first = rows[0]['date']
-    else:
-        dt_first = datetime.date.today()
     num_days = ( datetime.date.today() - dt_first ).days
     if num_days == 0:
         x = [dt_first, ]

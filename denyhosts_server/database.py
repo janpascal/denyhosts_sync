@@ -23,7 +23,7 @@ from tortoise import Tortoise
 
 from . import config
 from . import models
-#import stats
+from . import stats
 
 _quiet = False
 logger = logging.getLogger(__name__)

@@ -14,6 +14,7 @@
 #    You should have received a copy of the GNU Affero General Public License
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import codecs
 import configparser
 import inspect
 import logging
@@ -34,7 +35,7 @@ def _gethex(config, section, option, default=None):
     except configparser.NoOptionError:
         result = default
     if result is not None:
-        result = result.decode('hex')
+        result = codecs.decode(result, 'hex')
     return result
 
 def _getint(config, section, option, default=None):
