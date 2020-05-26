@@ -252,17 +252,28 @@ def translate_query(query):
     elif config.dbtype == "sqlite3":
         return query
     else:
+        logger.warning(f"unsupported database {config.dbtype} for query {query}")
         if not _quiet:
             print("unsupported database {}".format(config.dbtype))
         return query
 
-def run_query(query, *args):
-    return Registry.DBPOOL.runQuery(translate_query(query), args)
+async def run_query(query, *args):
+    #logger.debug(f"Connections: {Tortoise._connections}")
+    #print(f"Connections: {Tortoise._connections}")
+    conn = Tortoise.get_connection('default')
+    return await conn.execute_query(translate_query(query), args)
 
-def run_operation(query, *args):
-    return Registry.DBPOOL.runOperation(translate_query(query), args)
+async def run_query_dict(query, *args):
+    #logger.debug(f"Connections: {Tortoise._connections}")
+    #print(f"Connections: {Tortoise._connections}")
+    conn = Tortoise.get_connection('default')
+    return await conn.execute_query_dict(translate_query(query), args)
 
-def run_truncate_query(table):
+async def run_operation(query, *args):
+    conn = Tortoise.get_connection('default`')
+    await conn.execute_script(translate_query(query), args)
+
+async def run_truncate_query(table):
     global _quiet
     if config.dbtype == "MySQLdb":
         query = "TRUNCATE TABLE `{}`".format(table)
@@ -271,42 +282,43 @@ def run_truncate_query(table):
     else:
         if not _quiet:
             print("unsupported database {}".format(config.dbtype))
-    return Registry.DBPOOL.runQuery(query)
+    conn = tortoise.get_connection('default')
+    num_rows, result = await conn.execute_query(translate_query(query), args)
+    return num_rows
 
-def dump_crackers():
-    return run_query("SELECT * FROM crackers")
+async def dump_crackers():
+    return await run_query("SELECT * FROM crackers")
 
+async def dump_table(table):
+    rows = await run_query("SELECT * FROM " + table)
 
-def dump_table(table):
-    rows = yield run_query("SELECT * FROM " + table)
-
-    for i in xrange(len(rows)):
+    for i in range(len(rows)):
         row = rows[i]
-        for j in xrange(len(row)):
+        for j in range(len(row)):
             if isinstance(row[j], datetime.date):
                 l = list(row)
                 l[j] =time.mktime(row[j].timetuple())
                 rows[i] = tuple(l)
 
-def dump_reports_for_cracker(cracker_ip):
+async def dump_reports_for_cracker(cracker_ip):
     logging.debug("database.dump_reports_for_cracker({})".format(cracker_ip))
-    return run_query("SELECT r.* FROM reports r JOIN crackers c ON r.cracker_id = c.id WHERE c.ip_address=?", cracker_ip) 
+    return await run_query("SELECT r.* FROM reports r JOIN crackers c ON r.cracker_id = c.id WHERE c.ip_address=?", cracker_ip) 
 
-def bootstrap_table(table, params):
+async def bootstrap_table(table, params):
     if table=="info" and params[0]=="schema_version":
         return None
     query = "INSERT INTO " + table + " VALUES (" + ",".join(["?"]*len(params)) + ")"
-    return run_operation(query, *params)
+    return await run_operation(query, *params)
 
-def bootstrap_cracker(params):
+async def bootstrap_cracker(params):
     #query = "INSERT INTO crackers VALUES (" + ",".join(["?"]*len(params)) + ")"
     #logging.debug("Insert statement: {}".format(query))
     #return run_operation(query, *params)
-    return bootstrap_table("crackers", params)
+    return await bootstrap_table("crackers", params)
 
-def bootstrap_report(params):
+async def bootstrap_report(params):
     #query = "INSERT INTO reports VALUES (" + ",".join(["?"]*len(params)) + ")"
     #logging.debug("Insert statement: {}".format(query))
     #return run_operation(query, *params)
-    return bootstrap_table("reports", params)
+    return await bootstrap_table("reports", params)
 

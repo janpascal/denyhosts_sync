@@ -21,6 +21,7 @@ import random
 
 from aiohttp import web
 from aiohttp_xmlrpc import handler
+import aiohttp_jinja2
 import ipaddress
 from tortoise.exceptions import DoesNotExist
 
@@ -30,7 +31,7 @@ from .models import Cracker, Report
 from . import config
 from . import controllers
 from . import utils
-#import stats
+from . import stats
 #import peering
 
 logger = logging.getLogger(__name__)
@@ -235,26 +236,14 @@ class AppView(handler.XMLRPCView):
         return [(await Cracker.filter(ip_address=ip).values())[0], await
                 cracker.reports.all().values()] 
 
-##class WebResource(Resource):
-##    #isLeaf = True
-##
-##    def getChild(self, name, request):
-##        if name == '':
-##            return self
-##        return Resource.getChild(self, name, request)
-##
-##    def render_GET(self, request):
-##        logging.debug("GET({})".format(request))
-##        request.setHeader("Content-Type", "text/html; charset=utf-8")
-##        def done(result):
-##            if result is None:
-##                request.write("<h1>An error has occurred</h1>")
-##            else:
-##                request.write(result.encode('utf-8'))
-##            request.finish()
-##        def fail(err):
-##            request.processingFailed(err)
-##        stats.render_stats().addCallbacks(done, fail)
-##        return server.NOT_DONE_YET
+@aiohttp_jinja2.template('stats.html')
+async def stats_view(request):
+    logging.info("Rendering statistics page...")
+    if stats._cache is None:
+        while stats._cache is None:
+            logging.debug("No statistics cached yet, waiting for cache generation to finish...")
+            await asyncio.sleep(1)
+
+    return stats._cache["stats"]
 
 # vim: tabstop=8 expandtab shiftwidth=4 softtabstop=4

@@ -17,7 +17,9 @@
 import asyncio
 import logging
 import ipaddress
+import time
 
+logger = logging.getLogger(__name__)
 
 _hosts_busy = set()
 
@@ -58,5 +60,51 @@ def is_valid_ip_address(ip_address):
         ip.is_link_local):
         return False
     return True
+
+class PeriodicJob:
+    """ func must be defined with async def """
+    def __init__(self, period, func, *args, **kwargs):
+        self.period = period
+        self.func = func
+        self.args = args
+        self.kwargs = kwargs
+
+        self.stop_event = asyncio.Event()
+        self.stopped_event = asyncio.Event()
+        self.task = None
+
+    async def start(self):
+        self.task = asyncio.create_task(self.periodically())
+
+    async def stop(self, timeout = None):
+        self.stop_event.set()
+        try:
+            asyncio.wait_for(self.stopped_event, timeout)
+        except asyncio.TimeoutError:
+            if self.task is not None:
+                self.task.cancel()
+                try:
+                    await self.task
+                except asyncio.CancelledError:
+                    logger.warning("Task has been cancelled!")
+
+    async def periodically(self):
+        try:
+            logger.debug(f"periodically() for job {self.func}")
+            while not self.stop_event.is_set():
+                start_time = time.time()
+                logger.debug(f"Calling {self.func}")
+                await self.func(*(self.args), **(self.kwargs))
+                sleep_time = start_time + self.period - time.time()
+                if sleep_time > 0:
+                    try:
+                        await asyncio.wait_for(self.stop_event.wait(), sleep_time)
+                    except asyncio.TimeoutError:
+                        pass
+        except:
+            logger.exception(f"Unexpected exception in periodically() for {self.func}")
+        finally:
+            self.stopped_event.set()
+
 
 # vim: tabstop=8 expandtab shiftwidth=4 softtabstop=4

@@ -24,6 +24,8 @@ import sys
 import configparser
 
 from aiohttp import web
+import aiohttp_jinja2
+import jinja2
 from tortoise import Tortoise
 
 from . import views
@@ -34,7 +36,7 @@ from . import controllers
 from . import config
 from . import database
 from . import exceptions
-#import stats
+from . import stats
 from . import utils
 #import peering
 
@@ -46,29 +48,29 @@ def stop_reactor(value):
     print(value)
     reactor.stop()
 
-def sighup_handler(signum, frame):
-    global configfile
-    global main_xmlrpc_handler
-
-    logging.warning("Received SIGHUP, reloading configuration file...")
-    debug_was_on = config.enable_debug_methods
-    old_xmlrpc_listen_port = config.xmlrpc_listen_port
-    old_stats_listen_port = config.stats_listen_port
-    config.read_config(configfile)
-
-    configure_logging()
-    schedule_jobs()
-
-    if debug_was_on and not config.enable_debug_methods:
-        # Remove debug methods
-        # Missing API in class XMLRPC
-        del main_xmlrpc_handler.subHandlers["debug"]
-
-    if config.enable_debug_methods and not debug_was_on:
-        d = debug_views.DebugServer(main_xmlrpc_handler)
-        main_xmlrpc_handler.putSubHandler('debug', d)
-
-    stop_listening().addCallback(lambda _: start_listening())
+## def sighup_handler(signum, frame):
+##     global configfile
+##     global main_xmlrpc_handler
+## 
+##     logging.warning("Received SIGHUP, reloading configuration file...")
+##     debug_was_on = config.enable_debug_methods
+##     old_xmlrpc_listen_port = config.xmlrpc_listen_port
+##     old_stats_listen_port = config.stats_listen_port
+##     config.read_config(configfile)
+## 
+##     configure_logging()
+##     schedule_jobs()
+## 
+##     if debug_was_on and not config.enable_debug_methods:
+##         # Remove debug methods
+##         # Missing API in class XMLRPC
+##         del main_xmlrpc_handler.subHandlers["debug"]
+## 
+##     if config.enable_debug_methods and not debug_was_on:
+##         d = debug_views.DebugServer(main_xmlrpc_handler)
+##         main_xmlrpc_handler.putSubHandler('debug', d)
+## 
+##     stop_listening().addCallback(lambda _: start_listening())
 
 
 # TODO is this still necessary with aiohttp?
@@ -110,36 +112,46 @@ _stats_listener = None
 _xmlrpc_site = None
 
 # Returns a callback. Wait on it before the port(s) are actually closed
-def stop_listening():
-    logging.debug("main.stop_listening()")
-    global _xmlrpc_listener
-    global _stats_listener
-    global _xmlrpc_site
-
-    # It's not easy to actually close a listening port.
-    # You need to close both the port and the protocol,
-    # and wait for them
-    if _xmlrpc_listener is not None:
-        deferred = _xmlrpc_listener.stopListening()
-        deferred.addCallback(_xmlrpc_listener.loseConnection)
-    else:
-        deferred = Deferred()
-
-    if _stats_listener is not None:
-        deferred.addCallback(_stats_listener.stopListening)
-        deferred.addCallback(_stats_listener.loseConnection)
-
-    _xmlrpc_listener = None
-    _stats_listener = None
-    _xmlrpc_site = None
-
-    return deferred
+## def stop_listening():
+##     logging.debug("main.stop_listening()")
+##     global _xmlrpc_listener
+##     global _stats_listener
+##     global _xmlrpc_site
+## 
+##     # It's not easy to actually close a listening port.
+##     # You need to close both the port and the protocol,
+##     # and wait for them
+##     if _xmlrpc_listener is not None:
+##         deferred = _xmlrpc_listener.stopListening()
+##         deferred.addCallback(_xmlrpc_listener.loseConnection)
+##     else:
+##         deferred = Deferred()
+## 
+##     if _stats_listener is not None:
+##         deferred.addCallback(_stats_listener.stopListening)
+##         deferred.addCallback(_stats_listener.loseConnection)
+## 
+##     _xmlrpc_listener = None
+##     _stats_listener = None
+##     _xmlrpc_site = None
+## 
+##     return deferred
 
 async def start_listening():
     logging.debug("main.start_listening()")
 
     xmlrpc_app = web.Application()
     xmlrpc_app.router.add_view('/RPC2', views.AppView)
+    xmlrpc_app.router.add_view('/', views.stats_view)
+    xmlrpc_app.router.add_static('/static/graphs', config.graph_dir)
+    xmlrpc_app.router.add_static('/static', config.static_dir)
+
+    logger.debug(f"Template dir: {config.template_dir}")
+    aiohttp_jinja2.setup(xmlrpc_app,
+        loader=jinja2.FileSystemLoader(config.template_dir),
+        filters={
+            'datetime': stats.format_datetime
+            })
 
     runner = web.AppRunner(xmlrpc_app)
     await runner.setup()
@@ -197,29 +209,23 @@ async def start_listening():
 ##        _stats_listener = reactor.listenTCP(config.stats_listen_port, server.Site(stats_root))
 
 maintenance_job = None
-legacy_sync_job = None
 stats_job = None
 
-def schedule_jobs():
-    global maintenance_job, legacy_sync_job, stats_job
+
+async def schedule_jobs():
+    global maintenance_job, stats_job
 
     # Reschedule maintenance job
     if maintenance_job is not None:
-        maintenance_job.stop()
-    maintenance_job = task.LoopingCall(controllers.perform_maintenance)
-    maintenance_job.start(config.maintenance_interval, now=False)
-
-    # Reschedule legacy sync job
-    if legacy_sync_job is not None:
-        legacy_sync_job.stop()
-    legacy_sync_job = task.LoopingCall(controllers.download_from_legacy_server)
-    legacy_sync_job.start(config.legacy_frequency, now=False)
+        await maintenance_job.stop()
+    maintenance_job = utils.PeriodicJob(config.maintenance_interval, controllers.perform_maintenance)
+    await maintenance_job.start()
 
     # Reschedule stats job
     if stats_job is not None:
-        stats_job.stop()
-    stats_job = task.LoopingCall(stats.update_stats_cache)
-    stats_job.start(config.stats_frequency, now=True)
+        await stats_job.stop()
+    stats_job = utils.PeriodicJob(config.stats_frequency, stats.update_stats_cache)
+    await stats_job.start()
 
 def configure_logging():
     # Remove all handlers associated with the root logger object.
@@ -236,14 +242,30 @@ async def main(args, config):
     # TODO
     #peering.load_keys()
 
-    #Registry.DBPOOL = adbapi.ConnectionPool(config.dbtype, **config.dbparams)
-    #Registry.register(models.Cracker, models.Report, models.Legacy)
+    ## TODO: configurate database from configuration
+    db_config = {
+        'connections': {
+            # Dict format for connection
+            'default': {
+                'engine': 'tortoise.backends.sqlite',
+                'credentials': {
+                    'file_path': 'db.sqlite3',
+                }
+            }
+        },
+        'apps': {
+            'models': {
+                'models': ['denyhosts_server.models'],
+                # If no default_connection specified, defaults to 'default'
+                'default_connection': 'default',
+            }
+        }
+    }
 
-    
-    await Tortoise.init(
-        db_url='sqlite://db.sqlite3',
-        modules={'models': ['models']}
-    )
+    await Tortoise.init(config=db_config)
+    #    db_url='sqlite://db.sqlite3',
+    #    modules={'models': ['denyhosts_server.models']}
+    #)
 
     single_shot = False
 
@@ -285,8 +307,9 @@ async def main(args, config):
         await controllers.purge_ip(args.purge_ip)
 
     if not single_shot:
-        logger.debug("Setting up SIGHUP handler")
-        signal.signal(signal.SIGHUP, sighup_handler)
+        ## TODO
+        ## logger.debug("Setting up SIGHUP handler")
+        ## signal.signal(signal.SIGHUP, sighup_handler)
 
         try:
             # logger.debug("Checking database version...")
@@ -299,7 +322,7 @@ async def main(args, config):
             await start_listening()
 
             # Set up maintenance and legacy sync jobs
-            #schedule_jobs()
+            await schedule_jobs()
 
             # Run forever
             logger.info("Entering main loop")

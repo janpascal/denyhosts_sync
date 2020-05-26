@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 # denyhosts sync server
-# Copyright (C) 2015-2017 Jan-Pascal van Best <janpascal@vanbest.org>
+# Copyright (C) 2015-2020 Jan-Pascal van Best <janpascal@vanbest.org>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published
@@ -17,20 +17,15 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-import config
 import datetime
 import logging
 import os.path
 import socket
 import time
 
-from twisted.internet import reactor, threads, task
-from twisted.internet.defer import inlineCallbacks, returnValue
-from twisted.python import log
-from twistar.registry import Registry
-
-from jinja2 import Template, Environment, FileSystemLoader
-
+import aiodns
+from tortoise.functions import Count, Length, Min, Max, Sum 
+from tortoise.exceptions import DoesNotExist
 import GeoIP
 
 import matplotlib
@@ -40,9 +35,13 @@ import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 import numpy
 
-import models
-import database
-import __init__
+from . import config
+from . import models
+from .models import Cracker, Report, HistoryItem, CountryHistoryItem
+from . import database
+from . import version as _version
+
+logger = logging.getLogger(__name__)
 
 def format_datetime(value, format='medium'):
     dt = datetime.datetime.fromtimestamp(value)
@@ -58,7 +57,7 @@ def insert_zeroes(rows, max = None):
     if max is None:
         max = rows[-1][0] + 1
 
-    for value in xrange(max):
+    for value in range(max):
         if index < len(rows) and rows[index][0] == value:
             result.append(rows[index])
             index += 1
@@ -83,26 +82,29 @@ def humanize_number(number, pos):
             break
     return '%.*f%s' % (0, number / factor, suffix)
 
-# Functions containing blocking io, call from thread!
-def fixup_crackers(hosts):
+async def fixup_crackers(hosts):
     gi = GeoIP.new(GeoIP.GEOIP_MEMORY_CACHE)
+    resolver = aiodns.DNSResolver()
+    logger.debug(f"resolver: {resolver}; dir: {dir(resolver)}; type: {type(resolver)}")
     for host in hosts:
         try:
             host.country = gi.country_name_by_addr(host.ip_address)
-        except Exception, e:
+        except Exception as e:
             logging.debug("Exception looking up country for {}: {}".format(host.ip_address, e))
             host.country = ''
         try:
             if config.stats_resolve_hostnames:
-                hostinfo = socket.gethostbyaddr(host.ip_address)
-                host.hostname = hostinfo[0]
+                #hostinfo = socker.gethostbyaddr(host.ip_address)
+                hostinfo = await resolver.gethostbyaddr(host.ip_address)
+                logger.debug(f"hostinfo: {hostinfo}; dir: {dir(hostinfo)}; type: {type(hostinfo)}")
+                host.hostname = hostinfo.name
             else:
                 host.hostname = host.ip_address
-        except Exception, e:
+        except Exception as e:
             logging.debug("Exception looking up reverse DNS for {}: {}".format(host.ip_address, e))
             host.hostname = "-"
 
-def make_daily_graph(txn):
+async def make_daily_graph():
     # Calculate start of daily period: yesterday on the beginning of the
     # current hour
     now = time.time()
@@ -112,16 +114,17 @@ def make_daily_graph(txn):
     dt_start = dt_onthehour - datetime.timedelta(days=1)
     yesterday = int(dt_start.strftime('%s'))
 
-    txn.execute(database.translate_query("""
-        SELECT CAST((first_report_time-?)/3600 AS UNSIGNED INTEGER), count(*)
+    rows = await database.run_query_dict("""
+        SELECT CAST((first_report_time-?)/3600 AS UNSIGNED INTEGER) AS HOURS, count(*) AS COUNT
         FROM reports
         WHERE first_report_time > ?
         GROUP BY CAST((first_report_time-?)/3600 AS UNSIGNED INTEGER)
         ORDER BY first_report_time ASC
-        """), (yesterday, yesterday, yesterday))
-    rows = txn.fetchall()
+        """, yesterday, yesterday, yesterday)
     no_data = False
-    if not rows:
+    if rows:
+        rows = [(row['HOURS'], row['COUNT']) for row in rows]
+    else:
         logging.debug("No data for past 24 hours")
         no_data = True
         rows = [(0,0)]
@@ -158,26 +161,30 @@ def make_daily_graph(txn):
     fig.clf()
     plt.close(fig)
     
-def make_monthly_graph(txn):
+async def make_monthly_graph():
     # Calculate start of monthly period: last month on the beginning of the
     # current day
     today = datetime.date.today()
     dt_start = today - datetime.timedelta(weeks=4)
 
-    txn.execute(database.translate_query("""
+    rows = await database.run_query_dict("""
         SELECT date, num_reports
         FROM history
         WHERE date >= ?
         ORDER BY date ASC
-        """), (dt_start,))
-    rows = txn.fetchall()
+        """, dt_start)
     no_data = False
     if rows is None or len(rows)==0:
         no_data = True
         x = [ today, ]
         y = [ 0, ]
     else:
-        (x,y) = zip(*rows)
+        #(x,y) = zip(*rows)
+        if isinstance(rows[0]['date'], str):
+            x = [datetime.date.fromisoformat(row['date']) for row in rows]
+        else:
+            x = [row['date'] for row in rows]
+        y = [row['num_reports'] for row in rows]
 
     # calc the trendline
     x_num = mdates.date2num(x)
@@ -206,16 +213,18 @@ def make_monthly_graph(txn):
     fig.clf()
     plt.close(fig)
 
-def make_history_graph(txn):
+async def make_history_graph():
     # Graph since first record
-    txn.execute(database.translate_query("""
+    rows = await database.run_query_dict("""
         SELECT date FROM history 
         ORDER BY date ASC
         LIMIT 1
-        """))
-    first_time = txn.fetchall()
-    if first_time is not None and len(first_time)>0 and first_time[0][0] is not None:
-        dt_first = first_time[0][0]
+        """)
+    if rows is not None and len(rows)>0 and rows[0]['date'] is not None:
+        if isinstance(rows[0]['date'], str):
+            dt_first = datetime.date.fromisoformat(rows[0]['date'])
+        else:
+         dt_first = rows[0]['date']
     else:
         dt_first= datetime.date.today()
     num_days = ( datetime.date.today() - dt_first ).days
@@ -227,13 +236,17 @@ def make_history_graph(txn):
         x = [ dt_first, ]
         y = [ 0, ]
     else:
-        txn.execute(database.translate_query("""
+        rows = await database.run_query_dict("""
             SELECT date, num_reports
             FROM history
             ORDER BY date ASC
-            """))
-        rows = txn.fetchall()
-        (x,y) = zip(*rows)
+            """)
+        #(x,y) = zip(*rows)
+        if isinstance(rows[0]['date'], str):
+            x = [datetime.date.fromisoformat(row['date']) for row in rows]
+        else:
+            x = [row['date'] for row in rows]
+        y = [row['num_reports'] for row in rows]
 
     # calc the trendline
     x_num = mdates.date2num(x)
@@ -269,16 +282,18 @@ def make_history_graph(txn):
     fig.clf()
     plt.close(fig)
 
-def make_contrib_graph(txn):
+async def make_contrib_graph():
     # Number of reporters over days
-    txn.execute(database.translate_query("""
+    rows = await database.run_query_dict("""
         SELECT date FROM history 
         ORDER BY date ASC
         LIMIT 1
-        """))
-    first_time = txn.fetchall()
-    if first_time is not None and len(first_time)>0 and first_time[0][0] is not None:
-        dt_first = first_time[0][0]
+        """)
+    if rows is not None and len(rows)>0 and rows[0]['date'] is not None:
+        if isinstance(rows[0]['date'], str):
+            dt_first = datetime.date.fromisoformat(rows[0]['date'])
+        else:
+            dt_first = rows[0]['date']
     else:
         dt_first = datetime.date.today()
     num_days = ( datetime.date.today() - dt_first ).days
@@ -286,13 +301,17 @@ def make_contrib_graph(txn):
         x = [dt_first, ]
         y = [0, ]
     else:
-        txn.execute(database.translate_query("""
+        rows = await database.run_query_dict("""
             SELECT date, num_contributors
             FROM history
             ORDER BY date ASC
-            """))
-        rows = txn.fetchall()
-        (x,y) = zip(*rows)
+            """)
+        #(x,y) = zip(*rows)
+        if isinstance(rows[0]['date'], str):
+            x = [datetime.date.fromisoformat(row['date']) for row in rows]
+        else:
+            x = [row['date'] for row in rows]
+        y = [row['num_contributors'] for row in rows]
 
     fig = plt.figure()
     ax = fig.gca()
@@ -313,21 +332,22 @@ def make_contrib_graph(txn):
     fig.clf()
     plt.close(fig)
 
-def make_country_piegraph(txn):
+async def make_country_piegraph():
     # Total reports per country
     limit = 10 # Fixme configurable
-    txn.execute(database.translate_query("""
+    rows = await database.run_query_dict("""
         SELECT country, num_reports
         FROM country_history
         ORDER BY num_reports DESC
         LIMIT ?
-        """),(limit,))
+        """, limit)
 
-    rows = txn.fetchall()
     if rows is None or len(rows)==0:
         return
 
-    (labels,sizes) = zip(*rows)
+    #(labels,sizes) = zip(*rows)
+    labels = [row['country'] for row in rows]
+    sizes = [row['num_reports'] for row in rows]
 
     fig = plt.figure()
     ax = fig.add_subplot(111)
@@ -340,38 +360,42 @@ def make_country_piegraph(txn):
     fig.clf()
     plt.close(fig)
 
-def make_country_bargraph(txn):
+async def make_country_bargraph():
     # Total reports per country
     limit = 10 # Fixme configurable
 
-    txn.execute("""
-        SELECT sum(num_reports)
+    rows = await database.run_query_dict("""
+        SELECT sum(num_reports) AS TOTAL
         FROM country_history
         """)
 
-    rows = txn.fetchall()
     no_data = False
-    if rows is None or len(rows)==0 or rows[0] is None or rows[0][0] is None:
+    if rows is None or len(rows)==0 or rows[0] is None or rows[0]['TOTAL'] is None:
         no_data = True
         total_reports = 1
         countries = ["Unknown",]
         counts = [1,]
         max_count = 1
     else:
-        total_reports = int(rows[0][0])
+        total_reports = int(rows[0]['TOTAL'])
         
-        txn.execute(database.translate_query("""
+        rows = await database.run_query_dict("""
             SELECT country, num_reports
             FROM country_history
             ORDER BY num_reports DESC
             LIMIT ?
-            """),(limit,))
+            """, limit)
 
-        rows = txn.fetchall()
         if rows is None or len(rows)==0:
             return
 
-        (countries,counts) = zip(*reversed(rows))
+        #(countries,counts) = zip(*reversed(rows))
+        #(x,y) = zip(*rows)
+        logger.debug(f"Rows: {rows}")
+        rows = list(reversed(rows))
+        logger.debug(f"Reversed rows: {rows}")
+        countries = [row['country'] for row in rows]
+        counts = [row['num_reports'] for row in rows]
         max_count = max(counts)
 
     fig = plt.figure()
@@ -402,20 +426,19 @@ def make_country_bargraph(txn):
 _cache = None
 _stats_busy = False
 
-@inlineCallbacks
-def update_stats_cache():
+async def update_stats_cache():
     global _stats_busy
     global _cache
     if _stats_busy:
         logging.debug("Already updating statistics cache, exiting")
-        returnValue(None)
+        return
     _stats_busy = True
 
     logging.debug("Updating statistics cache...")
 
     # Fill history table for yesterday, when necessary
-    yield update_recent_history()
-    yield update_country_history()
+    await update_recent_history()
+    await update_country_history()
 
     now = time.time()
     stats = {}
@@ -424,143 +447,121 @@ def update_stats_cache():
     # Note paths configured in main.py by the Resource objects
     stats["static_base"] = "../static"
     stats["graph_base"] = "../static/graphs"
-    stats["server_version"] = __init__.version
+    stats["server_version"] = _version
     try:
-        #rows = yield database.run_query("SELECT num_hosts,num_reports, num_clients, new_hosts FROM stats ORDER BY time DESC LIMIT 1")
-        stats["num_hosts"] = yield models.Cracker.count()
-        stats["num_reports"] = yield models.Report.count()
+        #rows = await database.run_query("SELECT num_hosts,num_reports, num_clients, new_hosts FROM stats ORDER BY time DESC LIMIT 1")
+        stats["num_hosts"] = await models.Cracker.all().count()
+        stats["num_reports"] = await models.Report.all().count()
 
-        rows = yield database.run_query("SELECT count(DISTINCT ip_address) FROM reports") 
+        rows = await database.run_query_dict("SELECT count(DISTINCT ip_address) AS COUNT FROM reports") 
         if len(rows)>0:
-            stats["num_clients"] = rows[0][0]
+            stats["num_clients"] = rows[0]['COUNT']
         else:
             stats["num_clients"] = 0
 
         yesterday = now - 24*3600
-        stats["daily_reports"] = yield models.Report.count(where=["first_report_time>?", yesterday])
-        stats["daily_new_hosts"] = yield models.Cracker.count(where=["first_time>?", yesterday])
+        stats["daily_reports"] = await models.Report.filter(first_report_time__gt =  yesterday).count()
+        stats["daily_new_hosts"] = await models.Cracker.filter(first_time__gt = yesterday).count()
 
-        recent_hosts = yield models.Cracker.find(orderby="latest_time DESC", limit=10)
-        yield threads.deferToThread(fixup_crackers, recent_hosts)
+        recent_hosts = await models.Cracker.all().order_by("-latest_time").limit(100)
+        await fixup_crackers(recent_hosts)
         stats["recent_hosts"] = recent_hosts
 
-        most_reported_hosts = yield models.Cracker.find(orderby="total_reports DESC", limit=10)
-        yield threads.deferToThread(fixup_crackers, most_reported_hosts)
+        most_reported_hosts = await models.Cracker.all().order_by("-total_reports").limit(10)
+        await fixup_crackers(most_reported_hosts)
         stats["most_reported_hosts"] = most_reported_hosts
 
         logging.info("Stats: {} reports for {} hosts from {} reporters".format(
             stats["num_reports"], stats["num_hosts"], stats["num_clients"]))
 
-        yield Registry.DBPOOL.runInteraction(make_daily_graph)
-        yield Registry.DBPOOL.runInteraction(make_monthly_graph)
-        yield Registry.DBPOOL.runInteraction(make_contrib_graph)
-        yield Registry.DBPOOL.runInteraction(make_history_graph)
-        yield Registry.DBPOOL.runInteraction(make_country_bargraph)
+        ## TODO
+        await make_daily_graph()
+        await make_monthly_graph()
+        await make_contrib_graph()
+        await make_history_graph()
+        await make_country_bargraph()
 
         if _cache is None:
             _cache = {}
         _cache["stats"] = stats
         _cache["time"] = time.time()
         logging.debug("Finished updating statistics cache...")
-    except Exception, e:
-        log.err(_why="Error updating statistics: {}".format(e))
-        logging.warning("Error updating statistics: {}".format(e))
+    except Exception as e:
+        logging.exception("Error updating statistics")
 
     _stats_busy = False
 
-@inlineCallbacks
-def render_stats():
-    global _cache
-    logging.info("Rendering statistics page...")
-    if _cache is None:
-        while _cache is None:
-            logging.debug("No statistics cached yet, waiting for cache generation to finish...")
-            yield task.deferLater(reactor, 1, lambda _:0, 0)
-
-    now = time.time()
-    try:
-        env = Environment(loader=FileSystemLoader(config.template_dir))
-        env.filters['datetime'] = format_datetime
-        template = env.get_template('stats.html')
-        html = template.render(_cache["stats"])
-
-        logging.info("Done rendering statistics page...")
-        returnValue(html)
-    except Exception, e:
-        log.err(_why="Error rendering statistics page: {}".format(e))
-        logging.warning("Error creating statistics page: {}".format(e))
-
-def update_history_txn(txn, date):
+async def update_history(date):
     try:
         logging.info("Updating history table for {}".format(date))
         start = time.mktime(date.timetuple())
         end = start + 24*60*60
         #logging.debug("Date start, end: {}, {}".format(start, end))
 
-        txn.execute(database.translate_query("""
-                SELECT  COUNT(*), 
-                        COUNT(DISTINCT cracker_id),
-                        COUNT(DISTINCT ip_address) 
+        rows = await database.run_query_dict("""
+                SELECT  COUNT(*) AS NUM_REPORTS, 
+                        COUNT(DISTINCT cracker_id) AS NUM_HOSTS,
+                        COUNT(DISTINCT ip_address) AS NUM_REPORTERS 
                 FROM reports 
                 WHERE (first_report_time>=? AND first_report_time<?) OR
                       (latest_report_time>=? AND latest_report_time<?)
-                """), (start, end, start, end))
-        rows = txn.fetchall()
+                """, start, end, start, end)
+        logger.debug(f"Rows: {rows}")
         if rows is None or len(rows)==0:
             return
 
-        num_reports = rows[0][0]
-        num_hosts = rows[0][1]
-        num_reporters = rows[0][2]
+        num_reports = rows[0]['NUM_REPORTS']
+        num_hosts = rows[0]['NUM_HOSTS']
+        num_reporters = rows[0]['NUM_REPORTERS']
         logging.debug("Number of reporters: {}".format(num_reporters))
         logging.debug("Number of reports: {}".format(num_reports))
         logging.debug("Number of reported hosts: {}".format(num_hosts))
 
-        txn.execute(database.translate_query("""
+        await database.run_query("""
             REPLACE INTO history
                 (date, num_reports, num_contributors, num_reported_hosts)
                 VALUES (?,?,?,?)
-            """), (date, num_reports, num_reporters, num_hosts))
-    except Exception, e:
-        log.err(_why="Error updating history: {}".format(e))
-        logging.warning("Error updating history: {}".format(e))
+            """, date, num_reports, num_reporters, num_hosts)
+    except Exception as e:
+        logging.exception("Error updating history")
 
-def update_recent_history_txn(txn, last_date=None):
+async def update_recent_history(last_date=None):
     "date should be a datetime.date or None, indicating yesterday"
     if last_date is None:
         last_date = datetime.date.today() - datetime.timedelta(days = 1)
 
     try:
         # First find last date for which the history has already been filled
-        txn.execute("""SELECT max(date) AS "MAXDATE [DATE]" FROM history""") 
-        rows = txn.fetchall()
-        if rows is not None and len(rows)>0 and rows[0][0] is not None:
-            last_filled_date = rows[0][0]
-        else:
-            txn.execute("SELECT MIN(first_report_time) FROM reports")
-            first_time = txn.fetchall()
-            if first_time is not None and len(first_time)>0 and first_time[0][0] is not None:
-                last_filled_date = datetime.date.fromtimestamp(first_time[0][0])
-            else:
-                last_filled_date = datetime.date.today()
 
-        first_date = last_filled_date + datetime.timedelta(days=1)
+        rows = await database.run_query_dict("""SELECT max(date) AS "MAXDATE [DATE]" FROM history""") 
+        logger.debug(f"Rows: {rows}")
+        if rows is not None and len(rows)>0 and rows[0]['MAXDATE'] is not None:
+            last_filled_date = rows[0]['MAXDATE']
+            if isinstance(last_filled_date, str):
+                last_filled_date = datetime.date.fromisoformat(last_filled_date)
+            start_date = last_filled_date + datetime.timedelta(days=1)
+        else:
+            rows = await database.run_query_dict("SELECT MIN(first_report_time) AS 'MINTIME' FROM reports")
+            if rows is not None and len(rows)>0 and rows[0]['MINTIME'] is not None:
+                start_date = datetime.date.fromtimestamp(rows[0]['MINTIME'])
+            else:
+                start_date = datetime.date.today()
+        
+        #first_date = last_filled_date + datetime.timedelta(days=1)
         # Then fill history
-        date = first_date
+        date = start_date
         while date <= last_date:
-            update_history_txn(txn, date)
+            await update_history(date)
             date = date + datetime.timedelta(days = 1)
 
     except Exception as e:
-        log.err(_why="Error updating history: {}".format(e))
-        logging.warning("Error updating history: {}".format(e))
+        logging.exception("Error updating history")
 
     
-def fixup_history_txn(txn):
+async def fixup_history():
     try:
-        txn.execute("SELECT MIN(first_report_time) FROM reports")
-        first_time = txn.fetchall()
-        if first_time is not None and len(first_time)>0 and first_time[0][0] is not None:
+        rows = await database.run_query("SELECT MIN(first_report_time) FROM reports")
+        if row is not None and len(row)>0 and row[0][0] is not None:
             first_date = datetime.date.fromtimestamp(first_time[0][0])
         else:
             # No data, nothing to do
@@ -569,25 +570,19 @@ def fixup_history_txn(txn):
         last_date = datetime.date.today() - datetime.timedelta(days = 1)
 
         # Find any dates for which the history has not been filled
-        txn.execute("SELECT date FROM history ORDER BY date ASC") 
-        rows = txn.fetchall()
+        rows = await database.run_query("SELECT date FROM history ORDER BY date ASC") 
         dates = set([row[0] for row in rows])
 
         date = first_date
         while date <= last_date:
             if date not in dates:
-                update_history_txn(txn, date)
+                await update_history(date)
             date = date + datetime.timedelta(days = 1)
 
     except Exception as e:
-        log.err(_why="Error fixing up history: {}".format(e))
-        logging.warning("Error fixing up history: {}".format(e))
+        logging.exception("Error fixing up history")
 
-def update_recent_history(date=None):
-    "date should be a datetime.date or None, indicating yesterday"
-    return Registry.DBPOOL.runInteraction(update_recent_history_txn, date)
-
-def update_country_history_txn(txn, date=None, include_history = False):
+async def update_country_history(date=None, include_history = False):
     if date is None:
         date = datetime.date.today() - datetime.timedelta(days = 1)
 
@@ -597,48 +592,43 @@ def update_country_history_txn(txn, date=None, include_history = False):
         start_time = (date - datetime.date(1970, 1, 1)).total_seconds()
     end_time = (date + datetime.timedelta(days=1) - datetime.date(1970, 1, 1)).total_seconds()
 
-    txn.execute("SELECT country_code,country,num_reports FROM country_history")
-    rows = txn.fetchall()
-    result = {row[0]:(row[1],row[2]) for row in rows}
+    rows = await database.run_query_dict("SELECT country_code,country,num_reports FROM country_history")
+    logger.debug(f"Rows: {rows}")
+    result = {row['country_code']:(row['country'],row['num_reports']) for row in rows}
+    logger.debug(f"Result: {result}")
 
     gi = GeoIP.new(GeoIP.GEOIP_MEMORY_CACHE)
 
-    txn.execute(database.translate_query(
-        """SELECT crackers.ip_address,COUNT(*) as count
+    rows = await database.run_query_dict(
+        """SELECT crackers.ip_address AS IP_ADDRESS,COUNT(*) as COUNT
         FROM crackers LEFT JOIN reports ON reports.cracker_id = crackers.id
         WHERE reports.first_report_time >= ? AND reports.first_report_time < ?
         GROUP BY crackers.id
-        """), (start_time, end_time))
+        """, start_time, end_time)
 
-    while True:
-        rows = txn.fetchmany(size=100)
-        if len(rows) == 0:
-            break
-        for row in rows:
-            ip = row[0]
-            count = row[1]
-            try:
-                country_code = gi.country_code_by_addr(ip)
-                country = gi.country_name_by_addr(ip)
-                if country_code is None:
-                    country_code = "ZZ"
-                if country is None:
-                    country = "(Unknown)"
-                if country_code in result:
-                    count += result[country_code][1]
-                result[country_code] = (country,count)
-            except Exception, e:
-                logging.debug("Exception looking up country for {}: {}".format(ip, e))
+    for row in rows:
+        logger.debug(f"row: {row}")
+        ip = row['IP_ADDRESS']
+        count = row['COUNT']
+        try:
+            country_code = gi.country_code_by_addr(ip)
+            country = gi.country_name_by_addr(ip)
+            if country_code is None:
+                country_code = "ZZ"
+            if country is None:
+                country = "(Unknown)"
+            if country_code in result:
+                count += result[country_code][1]
+            result[country_code] = (country,count)
+        except Exception as e:
+            logging.debug("Exception looking up country for {}: {}".format(ip, e))
      
     for country_code in result:
         country,count = result[country_code]
-        txn.execute(database.translate_query(
+        await database.run_query(
             """REPLACE INTO country_history (country_code,country,num_reports)
-            VALUES (?,?,?)"""),
-            (country_code,country,count))
+            VALUES (?,?,?)""",
+            country_code,country,count)
 
-def update_country_history(date=None, include_history=False):
-    "date should be a datetime.date or None, indicating yesterday"
-    return Registry.DBPOOL.runInteraction(update_country_history_txn, date, include_history)
 
 # vim: tabstop=8 expandtab shiftwidth=4 softtabstop=4
