@@ -40,6 +40,30 @@ class Server(xmlrpc.XMLRPC):
 
     @withRequest
     @inlineCallbacks
+    def xmlrpc_version_report(self, request, version_info):
+        try:
+            x_real_ip = request.requestHeaders.getRawHeaders("X-Real-IP")
+            remote_ip = x_real_ip[0] if x_real_ip else request.getClientIP()
+            now = time.time()
+
+            logging.info("version_report({}) from {}".format(version_info, remote_ip))
+            yield controllers.handle_version_report_from_client(remote_ip, version_info, now)
+            try:
+                yield peering.send_version_update(remote_ip, version_info, now)
+            except xmlrpc.Fault, e:
+                raise e
+            except Exception, e:
+                logging.warning("Error sending version report")
+        except xmlrpc.Fault, e:
+            raise e
+        except Exception, e:
+            log.err(_why="Exception in version_report")
+            raise xmlrpc.Fault(104, "Error version report: {}".format(e))
+
+        returnValue(0)
+
+    @withRequest
+    @inlineCallbacks
     def xmlrpc_add_hosts(self, request, hosts):
         try:
             x_real_ip = request.requestHeaders.getRawHeaders("X-Real-IP")

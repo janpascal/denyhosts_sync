@@ -24,7 +24,7 @@ from twisted.internet.threads  import deferToThread
 import config
 import database
 import models
-from models import Cracker, Report, Legacy
+from models import Cracker, Report, Legacy, ClientVersion
 import utils
 
 def get_cracker(ip_address):
@@ -49,6 +49,42 @@ def handle_report_from_client(client_ip, timestamp, hosts):
         finally:
             utils.unlock_host(cracker_ip)
         logging.debug("Done adding report for {} from {}".format(cracker_ip,client_ip))
+
+@inlineCallbacks
+def handle_version_report_from_client(client_ip, version_info, timestamp):
+    if not utils.is_valid_ip_address(client_ip):
+        logging.warning("Illegal remote ip address {}".format(client_ip))
+        raise Exception("Illegal remote IP address \"{}\".".format(client_ip))
+
+    dh_version = version_info[1]
+    py_version = version_info[0]
+    try:
+        client_report = yield ClientVersion.find(
+            where=['ip_address=? AND denyhosts_version=?', client_ip, dh_version],
+            limit=1
+        )
+        if client_report is None:
+            logging.debug("Adding version report for {}".format(client_ip))
+            save_version = ClientVersion(
+                ip_address=client_ip,
+                first_time=timestamp,
+                latest_time=timestamp,
+                python_version=py_version,
+                denyhosts_version=dh_version,
+                total_reports=1
+            )
+            yield save_version.save()
+        else:
+            logging.debug('Updating Client Report: {}'.format(client_report))
+            client_report.latest_time = timestamp
+            client_report.python_version = py_version
+            client_report.denyhosts_version = dh_version
+            client_report.total_reports = client_report.total_reports + 1
+            yield client_report._update()
+
+    except Exception as e:
+        logging.exception('Error in Version Reporting: {}'.format(e))
+    logging.debug("Done adding report from {}".format(client_ip))
 
 # Note: lock cracker IP first!
 # Report merging algorithm by Anne Bezemer, see 
