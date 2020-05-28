@@ -60,7 +60,7 @@ def handle_version_report_from_client(client_ip, version_info, timestamp):
     py_version = version_info[0]
     try:
         client_report = yield ClientVersion.find(
-            where=['ip_address=? AND denyhosts_version=?', client_ip, dh_version],
+            where=['ip_address=?', client_ip],
             limit=1
         )
         if client_report is None:
