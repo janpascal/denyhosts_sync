@@ -49,7 +49,8 @@ class Server(xmlrpc.XMLRPC):
             logging.info("version_report({}) from {}".format(version_info, remote_ip))
             yield controllers.handle_version_report_from_client(remote_ip, version_info, now)
             try:
-                yield peering.send_version_update(remote_ip, version_info, now)
+                client_version_data = yield controllers.get_client_version(remote_ip)
+                yield peering.send_client_version_update(client_version_data)
             except xmlrpc.Fault, e:
                 raise e
             except Exception, e:
