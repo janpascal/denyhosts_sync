@@ -50,6 +50,14 @@ def handle_report_from_client(client_ip, timestamp, hosts):
             utils.unlock_host(cracker_ip)
         logging.debug("Done adding report for {} from {}".format(cracker_ip,client_ip))
 
+
+def get_client_version(client_ip):
+    return ClientVersion.find(
+        where=['ip_address=?', client_ip],
+        limit=1
+    )
+
+
 @inlineCallbacks
 def handle_version_report_from_client(client_ip, version_info, timestamp):
     if not utils.is_valid_ip_address(client_ip):
@@ -59,10 +67,7 @@ def handle_version_report_from_client(client_ip, version_info, timestamp):
     dh_version = version_info[1]
     py_version = version_info[0]
     try:
-        client_report = yield ClientVersion.find(
-            where=['ip_address=?', client_ip],
-            limit=1
-        )
+        client_report = yield get_client_version(client_ip)
         if client_report is None:
             logging.debug("Adding version report for {}".format(client_ip))
             save_version = ClientVersion(

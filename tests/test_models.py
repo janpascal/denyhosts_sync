@@ -18,7 +18,7 @@ import time
 
 from denyhosts_server import models
 from denyhosts_server import controllers 
-from denyhosts_server.models import Cracker, Report
+from denyhosts_server.models import Cracker, Report, ClientVersion
 
 from twisted.internet.defer import inlineCallbacks, returnValue
 
@@ -118,5 +118,26 @@ class ModelsTest(base.TestBase):
         self.assertEqual(len(reports), 0, "Maintenance should remove last report")
         cracker = yield controllers.get_cracker("192.168.1.1")
         self.assertIsNone(cracker, "Maintenance should remove cracker")
+
+
+class ClientVersionModelsTest(base.TestBase):
+
+    client_ip = '64.233.185.100'
+    python_version = '2.7.14'
+    denyhosts_version = '3.1.2'
+
+    def test_01_add_version_report(self):
+        now = time.time()
+        yield ClientVersion(
+            ip_address=self.client_ip,
+            first_time=now,
+            latest_time=now,
+            python_version=self.python_version,
+            denyhosts_version=self.denyhosts_version,
+            total_reports=1
+        ).save()
+
+        cv2 = yield controllers.get_client_version(self.client_ip)
+        yield self.assertIsNotNone(cv2, 'Added report is in database')
 
 # vim: tabstop=8 expandtab shiftwidth=4 softtabstop=4
