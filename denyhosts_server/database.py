@@ -38,7 +38,7 @@ def _remove_tables(txn):
     txn.execute("DROP TABLE IF EXISTS legacy")
     txn.execute("DROP TABLE IF EXISTS history")
     txn.execute("DROP TABLE IF EXISTS country_history")
-    txn.execute("DROP TABLE IF EXISTS ClientVersions")
+    txn.execute("DROP TABLE IF EXISTS client_version")
 
 def _evolve_database_initial(txn, dbtype):
     if dbtype=="sqlite3":
@@ -154,8 +154,8 @@ def _evolve_database_v9(txn, dbtype):
     elif dbtype == "MySQLdb":
         autoincrement = "AUTO_INCREMENT"
 
-    if dbtype == "MySQLdb":
-        txn.execute("""CREATE TABLE ClientVersions (
+    if dbtype in ['MySQLdb', 'sqlite3']:
+        txn.execute("""CREATE TABLE client_version (
             id INTEGER PRIMARY KEY {},
             ip_address VARCHAR(50),
             first_time INTEGER,
@@ -164,8 +164,8 @@ def _evolve_database_v9(txn, dbtype):
             denyhosts_version VARCHAR(25),
             total_reports INTEGER 
         )""".format(autoincrement))
-        txn.execute("CREATE INDEX denyhosts_version_count ON ClientVersions(total_reports)")
-        txn.execute("CREATE INDEX denyhosts_ip_version ON ClientVersions(denyhosts_version, ip_address)")
+        txn.execute("CREATE INDEX denyhosts_version_count ON client_version(total_reports)")
+        txn.execute("CREATE INDEX denyhosts_ip_version ON client_version(denyhosts_version, ip_address)")
 
 
 _evolutions = {

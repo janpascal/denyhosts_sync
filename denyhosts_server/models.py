@@ -20,7 +20,7 @@ from twistar.dbobject import DBObject
 
 
 class ClientVersion(DBObject):
-    TABLENAME = 'ClientVersions'
+    TABLENAME = 'client_version'
     column_names = ['ip_address', 'first_time', 'latest_time', 'python_version', 'denyhosts_version', 'total_reports']
 
     def __str__(self):
