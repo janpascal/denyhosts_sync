@@ -23,7 +23,7 @@ import xmlrpclib
 from xmlrpclib import ServerProxy
 
 from twisted.internet.defer import inlineCallbacks, returnValue
-from twisted.internet.threads  import deferToThread
+from twisted.internet.threads import deferToThread
 
 import libnacl.public
 import libnacl.utils
@@ -55,6 +55,30 @@ def send_update(client_ip, timestamp, hosts):
             yield deferToThread(server.peering.update, _own_key.pk.encode('hex'), base64)
         except:
             logging.warning("Unable to send update to peer {}".format(peer))
+
+@inlineCallbacks
+def send_client_version_update(client_info):
+    data = {
+        "ip_address": client_info.ip_address,
+        "first_time": client_info.first_time,
+        "latest_time": client_info.latest_time,
+        'python_version': client_info.python_version,
+        'denyhosts_version': client_info.denyhosts_version,
+        'total_reports': client_info.total_reports
+    }
+    data_json = json.dumps(data)
+
+    for peer in config.peers:
+        logging.debug("Sending client_version update to peer {}".format(peer))
+        crypted = _peer_boxes[peer].encrypt(data_json)
+        base64 = crypted.encode('base64')
+        try:
+            server = yield deferToThread(ServerProxy, peer)
+            yield deferToThread(server.peering.update, _own_key.pk.encode('hex'), base64)
+        except Exception as e:
+            logging.exception('Error in Peer Version Reporting: {}'.format(peer))
+    logging.debug("Done adding peer version reports from {}".format(client_ip))
+
 
 def decrypt_message(peer_key, message):
     peer = None
@@ -92,6 +116,7 @@ def handle_schema_version(peer_key, please):
     schema_version = yield database.get_schema_version()
 
     returnValue(schema_version)
+
 
 @inlineCallbacks
 def handle_all_hosts(peer_key, please):

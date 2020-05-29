@@ -1,0 +1,13 @@
+setuptools ; python_version < '3.0'
+twisted
+twistar
+libnacl
+ipaddr ; python_version < '3.0'
+GeoIP
+jinja2
+matplotlib
+numpy
+minify
+pysqlite ; python_version < '3.0'
+mysql-python ; python_version < '3.0'
+mysqlclient ; python_version >= '3.0'
