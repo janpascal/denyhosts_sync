@@ -19,6 +19,7 @@
 import argparse
 import asyncio
 import logging
+import os
 import signal
 import sys
 import configparser
@@ -38,15 +39,11 @@ from . import database
 from . import exceptions
 from . import stats
 from . import utils
-#import peering
+#from . import peering
 
 from . import __init__
 
 logger = logging.getLogger(__name__)
-
-def stop_reactor(value):
-    print(value)
-    reactor.stop()
 
 ## def sighup_handler(signum, frame):
 ##     global configfile
@@ -137,23 +134,15 @@ _xmlrpc_site = None
 ## 
 ##     return deferred
 
+#maintenance_job = None
+#stats_job = None
+
 async def start_listening():
+    app = create_app()
+
     logging.debug("main.start_listening()")
 
-    xmlrpc_app = web.Application()
-    xmlrpc_app.router.add_view('/RPC2', views.AppView)
-    xmlrpc_app.router.add_view('/', views.stats_view)
-    xmlrpc_app.router.add_static('/static/graphs', config.graph_dir)
-    xmlrpc_app.router.add_static('/static', config.static_dir)
-
-    logger.debug(f"Template dir: {config.template_dir}")
-    aiohttp_jinja2.setup(xmlrpc_app,
-        loader=jinja2.FileSystemLoader(config.template_dir),
-        filters={
-            'datetime': stats.format_datetime
-            })
-
-    runner = web.AppRunner(xmlrpc_app)
+    runner = web.AppRunner(app)
     await runner.setup()
     site = web.TCPSite(runner, port=config.xmlrpc_listen_port)
     await site.start()
@@ -208,25 +197,6 @@ async def start_listening():
 ##        logging.info("Start serving statistics on port {}".format(config.stats_listen_port))
 ##        _stats_listener = reactor.listenTCP(config.stats_listen_port, server.Site(stats_root))
 
-maintenance_job = None
-stats_job = None
-
-
-async def schedule_jobs():
-    global maintenance_job, stats_job
-
-    # Reschedule maintenance job
-    if maintenance_job is not None:
-        await maintenance_job.stop()
-    maintenance_job = utils.PeriodicJob(config.maintenance_interval, controllers.perform_maintenance)
-    await maintenance_job.start()
-
-    # Reschedule stats job
-    if stats_job is not None:
-        await stats_job.stop()
-    stats_job = utils.PeriodicJob(config.stats_frequency, stats.update_stats_cache)
-    await stats_job.start()
-
 def configure_logging():
     # Remove all handlers associated with the root logger object.
     for handler in logging.root.handlers[:]:
@@ -235,10 +205,14 @@ def configure_logging():
     # Use basic configuration
     logging.basicConfig(filename=config.logfile,
         level=config.loglevel,
-        format="%(asctime)s %(module)-8s %(levelname)-8s %(message)s",
+        format="%(asctime)s %(name)-16s %(levelname)-8s %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S")
 
-async def main(args, config):
+    logging.getLogger('aiosqlite').setLevel(logging.INFO)
+    logging.getLogger('db_client').setLevel(logging.INFO)
+    logging.getLogger('matplotlib.font_manager').setLevel(logging.INFO)
+
+async def init_database(app):
     # TODO
     #peering.load_keys()
 
@@ -262,116 +236,110 @@ async def main(args, config):
         }
     }
 
+    logger.debug("Configuring Tortoise-orm from db_config...")
     await Tortoise.init(config=db_config)
     #    db_url='sqlite://db.sqlite3',
     #    modules={'models': ['denyhosts_server.models']}
     #)
 
-    single_shot = False
 
-    if not args.force and (args.recreate_database
-        or args.evolve_database
-        or args.purge_reported_addresses
-        or args.recreate_database
-        or args.bootstrap_from_peer
-        or args.purge_ip is not None):
-        print("WARNING: do not run this method when denyhosts-server is running.")
-        reply = input("Are you sure you want to continue (Y/N): ")
-        if not reply.upper().startswith('Y'):
-            sys.exit()
+    logger.debug(f"Tortoise _connections: {Tortoise._connections}")
 
-    if args.check_peers:
-        if peering.check_peers():
-            sys.exit(0)
-        else:
-            sys.exit(1)
+async def start_jobs(app): 
+    # Reschedule maintenance job
+    if 'maintenance_job' in app:
+        await app['maintenance_job'].stop()
+    app['maintenance_job'] = utils.PeriodicJob(config.maintenance_interval, controllers.perform_maintenance)
+    await app['maintenance_job'].start()
 
-    if args.recreate_database:
-        single_shot = True
-        await database.clean_database()
+    # Reschedule stats job
+    if 'stats_job' in app:
+        await app['stats_job'].stop()
+    app['stats_job'] = utils.PeriodicJob(config.stats_frequency, stats.update_stats_cache)
+    await app['stats_job'].start()
 
-    if args.evolve_database:
-        single_shot = True
-        database.evolve_database().addCallbacks(stop_reactor, stop_reactor)
+async def stop_jobs(app):
+    logger.info("Stopping periodic jobs...")
+    # Stop maintenance job
+    if 'maintenance_job' in app:
+        await app['maintenance_job'].stop(timeout=30)
 
-    if args.bootstrap_from_peer:
-        single_shot = True
-        peering.bootstrap_from(args.bootstrap_from_peer).addCallbacks(stop_reactor, stop_reactor)
+    # Stop stats job
+    if 'stats_job' in app:
+        await app['stats_job'].stop(timeout=30)
 
-    if args.purge_reported_addresses:
-        single_shot = True
-        await controllers.purge_reported_addresses()
-
-    if args.purge_ip is not None:
-        single_shot = True
-        await controllers.purge_ip(args.purge_ip)
-
-    if not single_shot:
-        ## TODO
-        ## logger.debug("Setting up SIGHUP handler")
-        ## signal.signal(signal.SIGHUP, sighup_handler)
-
-        try:
-            # logger.debug("Checking database version...")
-            # no evolutions in Tortoise-ORM yet
-            # await database.check_database_version()
-
-            # TODO check if this is necessary
-            # reactor.addSystemEventTrigger("before", "shutdown", shutdown)
-
-            await start_listening()
-
-            # Set up maintenance and legacy sync jobs
-            await schedule_jobs()
-
-            # Run forever
-            logger.info("Entering main loop")
-            while True:
-                await asyncio.sleep(0.1)
-        except:
-            logger.exception("Unexpected exception in main loop")
-
+async def shutdown_database(app):
     await Tortoise.close_connections()
 
-def run_main():
+def create_app(arg_configfile=None):
     global configfile
-    global maintenance_job, legacy_sync_job
-    global main_xmlrpc_handler, stats_resource, web_root, web_static
 
-    parser = argparse.ArgumentParser(description="DenyHosts sync server")
-    parser.add_argument("-c", "--config", default="/etc/denyhosts-server.conf", help="Configuration file")
-    parser.add_argument("--recreate-database", action='store_true', help="Wipe and recreate the database")
-    parser.add_argument("--evolve-database", action='store_true', help="Evolve the database to the latest schema version")
-    parser.add_argument("--purge-legacy-addresses", action='store_true',
-       help="Purge all hosts downloaded from the legacy server. DO NOT USE WHEN DENYHOSTS-SERVER IS RUNNING!")
-    parser.add_argument("--purge-reported-addresses", action='store_true',
-        help="Purge all hosts that have been reported by clients. DO NOT USE WHEN DENYHOSTS-SERVER IS RUNNING!")
-    parser.add_argument("--purge-ip", action='store',
-        help="Purge ip address from both legacy and reported host lists. DO NOT USE WHEN DENYHOSTS-SERVER IS RUNNING!")
-    parser.add_argument("--check-peers", action="store_true", 
-        help="Check if all peers are responsive, and if they agree about the peer list")
-    parser.add_argument("--bootstrap-from-peer", action="store", metavar="PEER_URL",
-        help="First wipe database and then bootstrap database from peer. DO NOT USE WHEN DENYHOSTS-SERVER IS RUNNING!")
-    parser.add_argument("-f", "--force", action='store_true',
-        help="Do not ask for confirmation, execute action immediately")
-    args = parser.parse_args()
+    if arg_configfile is None:
+        configfile = os.environ.get('DENYHOSTS_SERVER_CONF', '/etc/denyhosts-server.conf')
+    else:
+        configfile = arg_configfile
 
-    configfile = args.config
+    print(f"Creating denyhosts-server app from config file {configfile}")
 
     try:
-        config.read_config(args.config)
-    except configparser.NoSectionError as e:
-        print("Error in reading the configuration file from \"{}\": {}.".format(args.config, e))
+        config.read_config(configfile)
+    except Exception as e:
+        print("Error in reading the configuration file from \"{}\": {}.".format(configfile, e))
+        print("Set the DENYHOSTS_SERVER_CONF enviromenment variable to change the configuration file location.")
         print("Please review the configuration file. Look at the supplied denyhosts-server.conf.example for more information.")
-        sys.exit()
+        raise Exception(f"Failed to read {configfile}")
 
     configure_logging()
     exceptions.register_exceptions()
 
-    asyncio.run(main(args, config))
+    app = web.Application()
+    app.router.add_view('/RPC2', views.AppView)
+    app.router.add_view('/', views.stats_view)
+    app.router.add_static('/static/graphs', config.graph_dir)
+    app.router.add_static('/static', config.static_dir)
 
+    app.on_startup.append(init_database)
+    app.on_startup.append(start_jobs)
+    app.on_shutdown.append(stop_jobs)
+    app.on_cleanup.append(shutdown_database)
 
-if __name__ == "__main__":
-    run_main()
+    logger.debug(f"Template dir: {config.template_dir}")
+    aiohttp_jinja2.setup(app,
+        loader=jinja2.FileSystemLoader(config.template_dir),
+        filters={
+            'datetime': stats.format_datetime
+            })
+
+    return app
+
+async def run_action(action, *args):
+    await init_database(None)
+
+    if action == "recreate-database":
+        await database.clean_database()
+    elif action == "evolve-database":
+        print("evolve-database not supported yet")
+        # await database.evolve_database()
+    elif action == "bootstrap-from-peer":
+        print("peering not supported yet")
+        #await peering.bootstrap_from(args[0])
+    elif action == "purge-reported-addresses":
+        await controllers.purge_reported_addresses()
+    elif action == "recalculate-history":
+        print("Clearing history...")
+        await stats.clear_history()
+        print("Recalculating history...")
+        await stats.update_recent_history()
+        await stats.update_country_history()
+    elif action == "purge-ip":
+        await controllers.purge_ip(args[0])
+    elif action == "check-peers":
+        print("peering not supported yet")
+        #if await peering.check_peers():
+        #    sys.exit(0)
+        #else:
+        #    sys.exit(1)
+
+    await shutdown_database(None)
 
 # vim: tabstop=8 expandtab shiftwidth=4 softtabstop=4

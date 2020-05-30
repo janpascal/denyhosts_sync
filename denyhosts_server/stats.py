@@ -85,23 +85,22 @@ def humanize_number(number, pos):
 async def fixup_crackers(hosts):
     gi = GeoIP.new(GeoIP.GEOIP_MEMORY_CACHE)
     resolver = aiodns.DNSResolver()
-    logger.debug(f"resolver: {resolver}; dir: {dir(resolver)}; type: {type(resolver)}")
     for host in hosts:
         try:
             host.country = gi.country_name_by_addr(host.ip_address)
         except Exception as e:
-            logging.debug("Exception looking up country for {}: {}".format(host.ip_address, e))
+            logger.debug("Exception looking up country for {}: {}".format(host.ip_address, e))
             host.country = ''
         try:
             if config.stats_resolve_hostnames:
                 #hostinfo = socker.gethostbyaddr(host.ip_address)
                 hostinfo = await resolver.gethostbyaddr(host.ip_address)
-                logger.debug(f"hostinfo: {hostinfo}; dir: {dir(hostinfo)}; type: {type(hostinfo)}")
+                #logger.debug(f"hostinfo: {hostinfo}; dir: {dir(hostinfo)}; type: {type(hostinfo)}")
                 host.hostname = hostinfo.name
             else:
                 host.hostname = host.ip_address
         except Exception as e:
-            logging.debug("Exception looking up reverse DNS for {}: {}".format(host.ip_address, e))
+            #logger.debug("Exception looking up reverse DNS for {}: {}".format(host.ip_address, e))
             host.hostname = "-"
 
 async def make_daily_graph():
@@ -125,12 +124,12 @@ async def make_daily_graph():
     if rows:
         rows = [(row['HOURS'], row['COUNT']) for row in rows]
     else:
-        logging.debug("No data for past 24 hours")
+        logger.debug("No data for past 24 hours")
         no_data = True
         rows = [(0,0)]
-    #logging.debug("Daily: {}".format(rows))
+    #logger.debug("Daily: {}".format(rows))
     rows = insert_zeroes(rows, 24)
-    #logging.debug("Daily: {}".format(rows))
+    #logger.debug("Daily: {}".format(rows))
 
     x = [dt_start + datetime.timedelta(hours=row[0]) for row in rows]
     y = [row[1] for row in rows]
@@ -233,8 +232,8 @@ async def make_history_graph():
     # Graph since first record
     dt_first = await first_history_date()
     num_days = ( datetime.date.today() - dt_first ).days
-    #logging.debug("First day in data set: {}".format(dt_first))
-    #logging.debug("Number of days in data set: {}".format(num_days))
+    #logger.debug("First day in data set: {}".format(dt_first))
+    #logger.debug("Number of days in data set: {}".format(num_days))
     no_data = False
     if num_days == 0:
         no_data = True
@@ -386,9 +385,9 @@ async def make_country_bargraph():
 
         #(countries,counts) = zip(*reversed(rows))
         #(x,y) = zip(*rows)
-        logger.debug(f"Rows: {rows}")
+        #logger.debug(f"Rows: {rows}")
         rows = list(reversed(rows))
-        logger.debug(f"Reversed rows: {rows}")
+        #logger.debug(f"Reversed rows: {rows}")
         countries = [row['country'] for row in rows]
         counts = [row['num_reports'] for row in rows]
         max_count = max(counts)
@@ -425,11 +424,11 @@ async def update_stats_cache():
     global _stats_busy
     global _cache
     if _stats_busy:
-        logging.debug("Already updating statistics cache, exiting")
+        logger.debug("Already updating statistics cache, exiting")
         return
     _stats_busy = True
 
-    logging.debug("Updating statistics cache...")
+    logger.debug("Updating statistics cache...")
 
     # Fill history table for yesterday, when necessary
     await update_recent_history()
@@ -458,7 +457,7 @@ async def update_stats_cache():
         stats["daily_reports"] = await models.Report.filter(first_report_time__gt =  yesterday).count()
         stats["daily_new_hosts"] = await models.Cracker.filter(first_time__gt = yesterday).count()
 
-        recent_hosts = await models.Cracker.all().order_by("-latest_time").limit(100)
+        recent_hosts = await models.Cracker.all().order_by("-latest_time").limit(10)
         await fixup_crackers(recent_hosts)
         stats["recent_hosts"] = recent_hosts
 
@@ -466,7 +465,7 @@ async def update_stats_cache():
         await fixup_crackers(most_reported_hosts)
         stats["most_reported_hosts"] = most_reported_hosts
 
-        logging.info("Stats: {} reports for {} hosts from {} reporters".format(
+        logger.info("Stats: {} reports for {} hosts from {} reporters".format(
             stats["num_reports"], stats["num_hosts"], stats["num_clients"]))
 
         ## TODO
@@ -480,18 +479,18 @@ async def update_stats_cache():
             _cache = {}
         _cache["stats"] = stats
         _cache["time"] = time.time()
-        logging.debug("Finished updating statistics cache...")
+        logger.debug("Finished updating statistics cache...")
     except Exception as e:
-        logging.exception("Error updating statistics")
+        logger.exception("Error updating statistics")
 
     _stats_busy = False
 
 async def update_history(date):
     try:
-        logging.info("Updating history table for {}".format(date))
+        logger.info("Updating history table for {}".format(date))
         start = time.mktime(date.timetuple())
         end = start + 24*60*60
-        #logging.debug("Date start, end: {}, {}".format(start, end))
+        #logger.debug("Date start, end: {}, {}".format(start, end))
 
         rows = await database.run_query_dict("""
                 SELECT  COUNT(*) AS NUM_REPORTS, 
@@ -501,16 +500,16 @@ async def update_history(date):
                 WHERE (first_report_time>=? AND first_report_time<?) OR
                       (latest_report_time>=? AND latest_report_time<?)
                 """, start, end, start, end)
-        logger.debug(f"Rows: {rows}")
+        #logger.debug(f"Rows: {rows}")
         if rows is None or len(rows)==0:
             return
 
         num_reports = rows[0]['NUM_REPORTS']
         num_hosts = rows[0]['NUM_HOSTS']
         num_reporters = rows[0]['NUM_REPORTERS']
-        logging.debug("Number of reporters: {}".format(num_reporters))
-        logging.debug("Number of reports: {}".format(num_reports))
-        logging.debug("Number of reported hosts: {}".format(num_hosts))
+        logger.debug("Number of reporters: {}".format(num_reporters))
+        logger.debug("Number of reports: {}".format(num_reports))
+        logger.debug("Number of reported hosts: {}".format(num_hosts))
 
         await database.run_query("""
             REPLACE INTO history
@@ -518,7 +517,7 @@ async def update_history(date):
                 VALUES (?,?,?,?)
             """, date, num_reports, num_reporters, num_hosts)
     except Exception as e:
-        logging.exception("Error updating history")
+        logger.exception("Error updating history")
 
 async def update_recent_history(last_date=None):
     "date should be a datetime.date or None, indicating yesterday"
@@ -529,7 +528,7 @@ async def update_recent_history(last_date=None):
         # First find last date for which the history has already been filled
 
         rows = await database.run_query_dict("""SELECT max(date) AS "MAXDATE [DATE]" FROM history""") 
-        logger.debug(f"Rows: {rows}")
+        #logger.debug(f"Rows: {rows}")
         if rows is not None and len(rows)>0 and rows[0]['MAXDATE'] is not None:
             last_filled_date = rows[0]['MAXDATE']
             if isinstance(last_filled_date, str):
@@ -550,7 +549,7 @@ async def update_recent_history(last_date=None):
             date = date + datetime.timedelta(days = 1)
 
     except Exception as e:
-        logging.exception("Error updating history")
+        logger.exception("Error updating history")
 
     
 async def fixup_history():
@@ -575,7 +574,7 @@ async def fixup_history():
             date = date + datetime.timedelta(days = 1)
 
     except Exception as e:
-        logging.exception("Error fixing up history")
+        logger.exception("Error fixing up history")
 
 async def update_country_history(date=None, include_history = False):
     if date is None:
@@ -588,7 +587,7 @@ async def update_country_history(date=None, include_history = False):
     end_time = (date + datetime.timedelta(days=1) - datetime.date(1970, 1, 1)).total_seconds()
 
     rows = await database.run_query_dict("SELECT country_code,country,num_reports FROM country_history")
-    logger.debug(f"Rows: {rows}")
+    #logger.debug(f"Rows: {rows}")
     result = {row['country_code']:(row['country'],row['num_reports']) for row in rows}
     logger.debug(f"Result: {result}")
 
@@ -602,7 +601,7 @@ async def update_country_history(date=None, include_history = False):
         """, start_time, end_time)
 
     for row in rows:
-        logger.debug(f"row: {row}")
+        #logger.debug(f"row: {row}")
         ip = row['IP_ADDRESS']
         count = row['COUNT']
         try:
@@ -616,7 +615,7 @@ async def update_country_history(date=None, include_history = False):
                 count += result[country_code][1]
             result[country_code] = (country,count)
         except Exception as e:
-            logging.debug("Exception looking up country for {}: {}".format(ip, e))
+            logger.debug("Exception looking up country for {}: {} ({})".format(ip, e, type(e)))
      
     for country_code in result:
         country,count = result[country_code]
@@ -624,6 +623,10 @@ async def update_country_history(date=None, include_history = False):
             """REPLACE INTO country_history (country_code,country,num_reports)
             VALUES (?,?,?)""",
             country_code,country,count)
+
+async def clear_history():
+    await database.run_query("DELETE FROM history")
+    await database.run_query("DELETE FROM country_history")
 
 
 # vim: tabstop=8 expandtab shiftwidth=4 softtabstop=4

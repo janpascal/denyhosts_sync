@@ -32,12 +32,13 @@ async def _remove_tables():
     global _quiet
     if not _quiet: 
         print("Removing all data from database and removing tables")
-    txn.execute("DROP TABLE IF EXISTS info")
-    txn.execute("DROP TABLE IF EXISTS crackers")
-    txn.execute("DROP TABLE IF EXISTS reports")
-    txn.execute("DROP TABLE IF EXISTS legacy")
-    txn.execute("DROP TABLE IF EXISTS history")
-    txn.execute("DROP TABLE IF EXISTS country_history")
+    conn = get_connection()
+    await conn.execute_query("DROP TABLE IF EXISTS info")
+    await conn.execute_query("DROP TABLE IF EXISTS crackers")
+    await conn.execute_query("DROP TABLE IF EXISTS reports")
+    await conn.execute_query("DROP TABLE IF EXISTS legacy")
+    await conn.execute_query("DROP TABLE IF EXISTS history")
+    await conn.execute_query("DROP TABLE IF EXISTS country_history")
 
 def _evolve_database_initial(txn, dbtype):
     if dbtype=="sqlite3":
@@ -209,8 +210,9 @@ def evolve_database():
 async def clean_database(quiet = False):
     global _quiet
     _quiet = quiet
-    # TODO
-    # await _remove_tables()
+
+    # Remove all tables
+    await _remove_tables()
     # Generate the schema
     await Tortoise.generate_schemas()
 
@@ -258,6 +260,7 @@ def translate_query(query):
         return query
 
 def get_connection():
+    #logger.debug(f"Tortoise._connections: {Tortoise._connections}")
     try:
         return Tortoise.get_connection('default')
     except KeyError:

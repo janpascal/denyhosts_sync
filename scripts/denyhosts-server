@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 # denyhosts sync server
-# Copyright (C) 2015 Jan-Pascal van Best <janpascal@vanbest.org>
+# Copyright (C) 2015-2020 Jan-Pascal van Best <janpascal@vanbest.org>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published
@@ -16,10 +16,105 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import argparse
+import asyncio
+import signal
+import sys
+import time
+
+from aiohttp import web
 
 import denyhosts_server.main
+import denyhosts_server.config
+
+async def shutdown_gracefully(app):
+    await denyhosts_server.main.stop_jobs(app)
+
+def sigint_handler(sig, app):
+    #print(f"Handling signal {sig}!")
+
+    loop = asyncio.get_event_loop()
+    task = loop.create_task(shutdown_gracefully(app))
+
+    def cb(task):
+        try:
+            task.result()
+            #print(f"Task result: {task.result()}")
+        except Exception as e:
+            print("Graceful shutdown task exception: {e}")
+        #print("Raising web.GracefulExit()!")
+        raise web.GracefulExit()
+
+    task.add_done_callback(cb)
+
+    #print("Removing signal handler")
+    loop.remove_signal_handler(sig)
+    #print("Finished signal handler")
+
+def main():
+    global configfile
+
+    parser = argparse.ArgumentParser(description="DenyHosts sync server")
+    parser.add_argument("-c", "--config", default="/etc/denyhosts-server.conf", help="Configuration file")
+    parser.add_argument("-f", "--force", action='store_true', help="Do not ask for confirmation, execute action immediately")
+
+    subparsers = parser.add_subparsers(help='which action to perform', dest='action')
+    subparsers.add_parser('run', help="Run denyhosts-server")
+
+    subparsers.add_parser("recreate-database", help="Wipe and recreate the database")
+    subparsers.add_parser("evolve-database", help="Evolve the database to the latest schema version")
+    subparsers.add_parser("purge-reported-addresses",
+        help="Purge all hosts that have been reported by clients. DO NOT USE WHEN DENYHOSTS-SERVER IS RUNNING!")
+    purge_parser = subparsers.add_parser("purge-ip",
+        help="Purge ip address from both legacy and reported host lists. DO NOT USE WHEN DENYHOSTS-SERVER IS RUNNING!")
+    purge_parser.add_argument("ip_address")
+    subparsers.add_parser("recalculate-history", 
+        help="Remove all history and recalculate ethe history tables!")
+    subparsers.add_parser("check-peers", 
+        help="Check if all peers are responsive, and if they agree about the peer list")
+    bootstrap_parser = subparsers.add_parser("bootstrap-from-peer", 
+        help="First wipe database and then bootstrap database from peer. DO NOT USE WHEN DENYHOSTS-SERVER IS RUNNING!")
+    bootstrap_parser.add_argument("peer_url")
+
+    args = parser.parse_args()
+
+    print(f"Args: {args}")
+
+    configfile = args.config
+
+    if args.action == "run" or args.action is None:
+        app = denyhosts_server.main.create_app(configfile)
+        port = denyhosts_server.config.xmlrpc_listen_port
+
+        loop = asyncio.get_event_loop()
+        # Workaround for aiohttp issue #3593, should be fixed in aiohttp 3.7
+        loop.add_signal_handler(signal.SIGINT, sigint_handler, signal.SIGINT, app)
+        loop.add_signal_handler(signal.SIGTERM, sigint_handler, signal.SIGTERM, app)
+        web.run_app(app, port=port, handle_signals=False)
+        sys.exit(0)
+
+    if not args.force:
+        print("WARNING: do not run this method when denyhosts-server is running.")
+        reply = input("Are you sure you want to continue (Y/N): ")
+        if not reply.upper().startswith('Y'):
+            sys.exit()
+
+    if args.action == "purge-ip":
+        params = [ args.ip_address ]
+    elif args.action == "bootstrap-from-peer":
+        params = [ args.peer_url ]
+    else:
+        params = []
+
+    try:
+        denyhosts_server.config.read_config(configfile)
+    except Exception as e:
+        print("Error in reading the configuration file from \"{}\": {}.".format(configfile, e))
+        sys.exit(1)
+
+    asyncio.run(denyhosts_server.main.run_action(args.action, *params))
 
 if __name__ == '__main__':
-    denyhosts_server.main.run_main()
+    main()
 
 # vim: tabstop=8 expandtab shiftwidth=4 softtabstop=4

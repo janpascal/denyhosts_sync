@@ -77,16 +77,19 @@ class PeriodicJob:
         self.task = asyncio.create_task(self.periodically())
 
     async def stop(self, timeout = None):
+        logger.debug(f"Setting stop event {self.stop_event}")
         self.stop_event.set()
         try:
-            asyncio.wait_for(self.stopped_event, timeout)
+            await asyncio.wait_for(self.stopped_event.wait(), timeout)
+            logger.debug(f"Periodically for function {self.func} has stopped")
         except asyncio.TimeoutError:
+            logger.debug(f"Timed out waiting for stopped event, cancelling {self.task}")
             if self.task is not None:
                 self.task.cancel()
                 try:
                     await self.task
                 except asyncio.CancelledError:
-                    logger.warning("Task has been cancelled!")
+                    logger.warning(f"Periodically task for function {self.func} has been cancelled!")
 
     async def periodically(self):
         try:
@@ -99,8 +102,10 @@ class PeriodicJob:
                 if sleep_time > 0:
                     try:
                         await asyncio.wait_for(self.stop_event.wait(), sleep_time)
+                        logger.debug("Received stop_event in periodially()")
                     except asyncio.TimeoutError:
                         pass
+            logger.debug("Stop event has been set")
         except:
             logger.exception(f"Unexpected exception in periodically() for {self.func}")
         finally:
