@@ -18,28 +18,27 @@ import argparse
 import logging
 import signal
 import sys
-import ConfigParser
+import configparser
 
 from twisted.web import server, resource, static
 from twisted.enterprise import adbapi
 from twisted.internet import task, reactor
-from twisted.internet.defer import inlineCallbacks, returnValue
+from twisted.internet.defer import inlineCallbacks, returnValue, Deferred
 from twisted.python import log
 
 from twistar.registry import Registry
 
-import views
-import debug_views
-import peering_views
-import models
-import controllers
-import config
-import database
-import stats
-import utils
-import peering
-
-import __init__
+from . import version
+from . import views
+from . import debug_views
+from . import peering_views
+from . import models
+from . import controllers
+from . import config
+from . import database
+from . import stats
+from . import utils
+from . import peering
 
 def stop_reactor(value):
     print(value)
@@ -248,7 +247,7 @@ def run_main():
 
     try:
         config.read_config(args.config)
-    except ConfigParser.NoSectionError, e:
+    except configparser.NoSectionError as e:
         print("Error in reading the configuration file from \"{}\": {}.".format(args.config, e))
         print("Please review the configuration file. Look at the supplied denyhosts-server.conf.example for more information.")
         sys.exit()
@@ -270,7 +269,7 @@ def run_main():
         or args.bootstrap_from_peer
         or args.purge_ip is not None):
         print("WARNING: do not run this method when denyhosts-server is running.")
-        reply = raw_input("Are you sure you want to continue (Y/N): ")
+        reply = input("Are you sure you want to continue (Y/N): ")
         if not reply.upper().startswith('Y'):
             sys.exit()
 
@@ -315,7 +314,7 @@ def run_main():
         schedule_jobs()
 
     # Start reactor
-    logging.info("Starting denyhosts-server version {}".format(__init__.version))
+    logging.info("Starting denyhosts-server version {}".format(version))
     reactor.run()
 
 # vim: tabstop=8 expandtab shiftwidth=4 softtabstop=4

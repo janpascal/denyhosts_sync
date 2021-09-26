@@ -19,8 +19,7 @@ import logging
 import json
 import os.path
 import sys
-import xmlrpclib
-from xmlrpclib import ServerProxy
+from xmlrpc.client import ServerProxy
 
 from twisted.internet.defer import inlineCallbacks, returnValue
 from twisted.internet.threads  import deferToThread
@@ -28,12 +27,12 @@ from twisted.internet.threads  import deferToThread
 import libnacl.public
 import libnacl.utils
 
-import __init__
-import config
-import controllers
-import database
-from models import Cracker, Report
-import utils
+from . import version
+from . import config
+from . import controllers
+from . import database
+from .models import Cracker, Report
+from . import utils
 
 _own_key = None
 
@@ -116,7 +115,7 @@ def handle_all_reports_for_host(peer_key, host):
 
     if not utils.is_valid_ip_address(host):
         logging.warning("Illegal IP address for all_reports_for_host: {}".format(host))
-        raise Exception("Illegal request {}".format(data))
+        raise Exception("Illegal request {}".format(host))
 
     reports = yield database.dump_reports_for_cracker(host)
 
@@ -151,7 +150,7 @@ def list_peers(peer_key, please):
         raise Exception("Illegal request {}".format(data))
 
     return {
-            "server_version": __init__.version,
+            "server_version": version,
             "peers": {
                 peer: config.peers[peer].encode('hex') 
                 for peer in config.peers
@@ -236,7 +235,7 @@ def check_peers():
         peer_server = ServerProxy(peer)
         try:
             response = peer_server.list_peers(_own_key.pk.encode('hex'), _peer_boxes[peer].encrypt('please').encode('base64'))
-        except Exception, e:
+        except Exception as e:
             print("Error requesting peer list from {} (maybe it's down, or it doesn't know my key!)".format(peer))
             print("Error message: {}".format(e))
             success = False

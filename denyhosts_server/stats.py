@@ -16,8 +16,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-
-import config
 import datetime
 import logging
 import os.path
@@ -40,9 +38,10 @@ import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 import numpy
 
-import models
-import database
-import __init__
+from . import version
+from . import config
+from . import models
+from . import database
 
 def format_datetime(value, format='medium'):
     dt = datetime.datetime.fromtimestamp(value)
@@ -58,7 +57,7 @@ def insert_zeroes(rows, max = None):
     if max is None:
         max = rows[-1][0] + 1
 
-    for value in xrange(max):
+    for value in range(max):
         if index < len(rows) and rows[index][0] == value:
             result.append(rows[index])
             index += 1
@@ -89,7 +88,7 @@ def fixup_crackers(hosts):
     for host in hosts:
         try:
             host.country = gi.country_name_by_addr(host.ip_address)
-        except Exception, e:
+        except Exception as e:
             logging.debug("Exception looking up country for {}: {}".format(host.ip_address, e))
             host.country = ''
         try:
@@ -98,7 +97,7 @@ def fixup_crackers(hosts):
                 host.hostname = hostinfo[0]
             else:
                 host.hostname = host.ip_address
-        except Exception, e:
+        except Exception as e:
             logging.debug("Exception looking up reverse DNS for {}: {}".format(host.ip_address, e))
             host.hostname = "-"
 
@@ -424,7 +423,7 @@ def update_stats_cache():
     # Note paths configured in main.py by the Resource objects
     stats["static_base"] = "../static"
     stats["graph_base"] = "../static/graphs"
-    stats["server_version"] = __init__.version
+    stats["server_version"] = version
     try:
         #rows = yield database.run_query("SELECT num_hosts,num_reports, num_clients, new_hosts FROM stats ORDER BY time DESC LIMIT 1")
         stats["num_hosts"] = yield models.Cracker.count()
@@ -462,7 +461,7 @@ def update_stats_cache():
         _cache["stats"] = stats
         _cache["time"] = time.time()
         logging.debug("Finished updating statistics cache...")
-    except Exception, e:
+    except Exception as e:
         log.err(_why="Error updating statistics: {}".format(e))
         logging.warning("Error updating statistics: {}".format(e))
 
@@ -486,7 +485,7 @@ def render_stats():
 
         logging.info("Done rendering statistics page...")
         returnValue(html)
-    except Exception, e:
+    except Exception as e:
         log.err(_why="Error rendering statistics page: {}".format(e))
         logging.warning("Error creating statistics page: {}".format(e))
 
@@ -521,7 +520,7 @@ def update_history_txn(txn, date):
                 (date, num_reports, num_contributors, num_reported_hosts)
                 VALUES (?,?,?,?)
             """), (date, num_reports, num_reporters, num_hosts))
-    except Exception, e:
+    except Exception as e:
         log.err(_why="Error updating history: {}".format(e))
         logging.warning("Error updating history: {}".format(e))
 
@@ -627,7 +626,7 @@ def update_country_history_txn(txn, date=None, include_history = False):
                 if country_code in result:
                     count += result[country_code][1]
                 result[country_code] = (country,count)
-            except Exception, e:
+            except Exception as e:
                 logging.debug("Exception looking up country for {}: {}".format(ip, e))
      
     for country_code in result:

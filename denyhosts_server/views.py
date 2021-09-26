@@ -25,13 +25,13 @@ from twisted.internet.defer import inlineCallbacks, returnValue
 from twisted.internet import reactor
 from twisted.python import log
 
-import models
-from models import Cracker, Report
-import config
-import controllers
-import utils
-import stats
-import peering
+from . import models
+from .models import Cracker, Report
+from . import config
+from . import controllers
+from . import utils
+from . import stats
+from . import peering
 
 class Server(xmlrpc.XMLRPC):
     """
@@ -50,13 +50,13 @@ class Server(xmlrpc.XMLRPC):
             yield controllers.handle_report_from_client(remote_ip, now, hosts)
             try:
                 yield peering.send_update(remote_ip, now, hosts)
-            except xmlrpc.Fault, e:
+            except xmlrpc.Fault as e:
                 raise e
-            except Exception, e:
+            except Exception as e:
                 logging.warning("Error sending update to peers")
-        except xmlrpc.Fault, e:
+        except xmlrpc.Fault as e:
             raise e
-        except Exception, e:
+        except Exception as e:
             log.err(_why="Exception in add_hosts")
             raise xmlrpc.Fault(104, "Error adding hosts: {}".format(e))
 
@@ -72,9 +72,9 @@ class Server(xmlrpc.XMLRPC):
             logging.debug("get_new_hosts({},{},{},{}) from {}".format(timestamp, threshold, 
                 hosts_added, resiliency, remote_ip))
             try:
-                timestamp = long(timestamp)
+                timestamp = int(timestamp)
                 threshold = int(threshold)
-                resiliency = long(resiliency)
+                resiliency = int(resiliency)
             except:
                 logging.warning("Illegal arguments to get_new_hosts from client {}".format(remote_ip))
                 raise xmlrpc.Fault(102, "Illegal parameters.")
@@ -96,14 +96,14 @@ class Server(xmlrpc.XMLRPC):
             # TODO: check if client IP is a known cracker
 
             result = {}
-            result['timestamp'] = str(long(time.time()))
+            result['timestamp'] = str(int(time.time()))
             result['hosts'] = yield controllers.get_qualifying_crackers(
                     threshold, resiliency, timestamp, 
                     config.max_reported_crackers, set(hosts_added))
             logging.debug("returning: {}".format(result))
-        except xmlrpc.Fault, e:
+        except xmlrpc.Fault as e:
             raise e
-        except Exception, e:
+        except Exception as e:
             log.err(_why="Exception in xmlrpc_get_new_hosts")
             raise xmlrpc.Fault(105, "Error in get_new_hosts: {}".format(str(e)))
         returnValue( result)

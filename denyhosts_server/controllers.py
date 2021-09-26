@@ -16,16 +16,16 @@
 
 import logging
 import time
-import xmlrpclib
+from xmlrpc.client import ServerProxy
 
 from twisted.internet.defer import inlineCallbacks, returnValue
 from twisted.internet.threads  import deferToThread
 
-import config
-import database
-import models
-from models import Cracker, Report, Legacy
-import utils
+from . import config
+from . import database
+from . import models
+from .models import Cracker, Report, Legacy
+from . import utils
 
 def get_cracker(ip_address):
     return Cracker.find(where=["ip_address=?",ip_address], limit=1)
@@ -241,7 +241,7 @@ def download_from_legacy_server():
     last_legacy_sync_time = int(rows[0][0])
 
     try:
-        server = yield deferToThread(xmlrpclib.ServerProxy, config.legacy_server)
+        server = yield deferToThread(ServerProxy, config.legacy_server)
 
         response = yield deferToThread(server.get_new_hosts, 
             last_legacy_sync_time, config.legacy_threshold, [],
@@ -263,7 +263,7 @@ def download_from_legacy_server():
                 logging.debug("Known host from legacy server: {}".format(host))
                 legacy.retrieved_time = now
             yield legacy.save()
-    except Exception, e:
+    except Exception as e:
         logging.error("Error retrieving info from legacy server: {}".format(e))
 
     logging.info("Done downloading hosts from legacy server.")

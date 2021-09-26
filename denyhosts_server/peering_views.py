@@ -26,13 +26,13 @@ from twisted.internet.defer import inlineCallbacks, returnValue
 from twisted.internet import reactor
 from twisted.python import log
 
-import models
-from models import Cracker, Report
-import config
-import controllers
-import utils
-import stats
-import peering
+from . import models
+from .models import Cracker, Report
+from . import config
+from . import controllers
+from . import utils
+from . import stats
+from . import peering
 
 class PeeringServer(xmlrpc.XMLRPC):
     """
@@ -47,9 +47,9 @@ class PeeringServer(xmlrpc.XMLRPC):
             key = key.decode('hex')
             update = update.decode('base64')
             yield peering.handle_update(key, update)
-        except xmlrpc.Fault, e:
+        except xmlrpc.Fault as e:
             raise e
-        except Exception, e:
+        except Exception as e:
             log.err(_why="Exception in update")
             raise xmlrpc.Fault(105, "Error in update({},{})".format(key, update))
         returnValue(0)
@@ -63,9 +63,9 @@ class PeeringServer(xmlrpc.XMLRPC):
             please = please.decode('base64')
             result = yield peering.handle_schema_version(key, please)
             returnValue(result)
-        except xmlrpc.Fault, e:
+        except xmlrpc.Fault as e:
             raise e
-        except Exception, e:
+        except Exception as e:
             log.err(_why="Exception in schema_version")
             raise xmlrpc.Fault(106, "Error in schema_version({},{})".format(key, please))
 
@@ -78,9 +78,9 @@ class PeeringServer(xmlrpc.XMLRPC):
             please = please.decode('base64')
             result = yield peering.handle_all_hosts(key, please)
             returnValue(result)
-        except xmlrpc.Fault, e:
+        except xmlrpc.Fault as e:
             raise e
-        except Exception, e:
+        except Exception as e:
             log.err(_why="Exception in all_hosts")
             raise xmlrpc.Fault(106, "Error in all_hosts({},{})".format(key, please))
 
@@ -93,9 +93,9 @@ class PeeringServer(xmlrpc.XMLRPC):
             host = host.decode('base64')
             result = yield peering.handle_all_reports_for_host(key, host)
             returnValue(result)
-        except xmlrpc.Fault, e:
+        except xmlrpc.Fault as e:
             raise e
-        except Exception, e:
+        except Exception as e:
             log.err(_why="Exception in all_updates_for_host")
             raise xmlrpc.Fault(107, "Error in all_updates_for_host({},{})".format(key, host))
 
@@ -108,9 +108,9 @@ class PeeringServer(xmlrpc.XMLRPC):
             host = host.decode('base64')
             result = yield peering.handle_dump_table(key, host)
             returnValue(result)
-        except xmlrpc.Fault, e:
+        except xmlrpc.Fault as e:
             raise e
-        except Exception, e:
+        except Exception as e:
             log.err(_why="Exception in dump_table")
             raise xmlrpc.Fault(106, "Error in dump_table({},{})".format(key, host))
 
@@ -125,9 +125,9 @@ class PeeringServer(xmlrpc.XMLRPC):
             result = peering.list_peers(key, please)
             yield
             returnValue(result)
-        except xmlrpc.Fault, e:
+        except xmlrpc.Fault as e:
             raise e
-        except Exception, e:
+        except Exception as e:
             log.err(_why="Exception in list_peers")
             raise xmlrpc.Fault(108, "Error in list_peers({},{})".format(key, please))
         returnValue(0)

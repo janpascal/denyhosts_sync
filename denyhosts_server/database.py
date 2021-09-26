@@ -23,8 +23,8 @@ from twisted.internet.defer import inlineCallbacks, returnValue
 
 import GeoIP
 
-import config
-import stats
+from . import config
+from . import stats
 
 _quiet = False
 
@@ -278,9 +278,9 @@ def dump_crackers():
 def dump_table(table):
     rows = yield run_query("SELECT * FROM " + table)
 
-    for i in xrange(len(rows)):
+    for i in range(len(rows)):
         row = rows[i]
-        for j in xrange(len(row)):
+        for j in range(len(row)):
             if isinstance(row[j], datetime.date):
                 l = list(row)
                 l[j] =time.mktime(row[j].timetuple())

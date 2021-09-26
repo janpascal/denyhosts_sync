@@ -14,7 +14,7 @@
 #    You should have received a copy of the GNU Affero General Public License
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import ConfigParser
+import configparser
 import inspect
 import logging
 import os.path
@@ -24,14 +24,14 @@ import sqlite3
 def _get(config, section, option, default=None):
     try:
         result = config.get(section, option)
-    except ConfigParser.NoOptionError:
+    except configparser.NoOptionError:
         result = default
     return result
 
 def _gethex(config, section, option, default=None):
     try:
         result = config.get(section, option)
-    except ConfigParser.NoOptionError:
+    except configparser.NoOptionError:
         result = default
     if result is not None:
         result = result.decode('hex')
@@ -40,21 +40,21 @@ def _gethex(config, section, option, default=None):
 def _getint(config, section, option, default=None):
     try:
         result = config.getint(section, option)
-    except ConfigParser.NoOptionError:
+    except configparser.NoOptionError:
         result = default
     return result
 
 def _getboolean(config, section, option, default=None):
     try:
         result = config.getboolean(section, option)
-    except ConfigParser.NoOptionError:
+    except configparser.NoOptionError:
         result = default
     return result
 
 def _getfloat(config, section, option, default=None):
     try:
         result = config.getfloat(section, option)
-    except ConfigParser.NoOptionError:
+    except configparser.NoOptionError:
         result = default
     return result
 
@@ -75,7 +75,7 @@ def read_config(filename):
     global static_dir, graph_dir, template_dir
     global key_file, peers
 
-    _config = ConfigParser.SafeConfigParser()
+    _config = configparser.SafeConfigParser()
     _config.readfp(open(filename,'r'))
 
     dbtype = _get(_config, "database", "type", "sqlite3")
