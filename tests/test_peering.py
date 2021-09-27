@@ -20,8 +20,8 @@ import os.path
 import signal
 import time
 import subprocess
-import xmlrpclib
-from xmlrpclib import ServerProxy
+
+from xmlrpc.client import ServerProxy
 
 from denyhosts_server import config
 from denyhosts_server import models
@@ -38,7 +38,7 @@ from  twisted.python import log
 import libnacl.public
 import libnacl.utils
 
-import base
+from . import base
 import logging
 
 
@@ -73,6 +73,8 @@ class TestPeering(base.TestBase):
                 except:
                     time.sleep(0.2)
             if not is_up:
+                # Try to stop the server in case they are started to leave with a clean environment
+                self.tearDown()
                 self.fail("Failed to start peer {}".format(peer_url))
 
     def tearDown(self):

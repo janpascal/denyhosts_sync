@@ -253,7 +253,7 @@ def check_peers():
                 print("    Peer {} does not know peer {}!".format(peer, other_peer))
                 success = False
                 continue
-            if config.peers[other_peer] != peer_list[other_peer].decode('hex'):
+            if config.peers[other_peer] != bytes.fromhex(peer_list[other_peer]):
                 print("    Peer {} knows peer {} but with key {} instead of {}!".format(peer, other_peer, peer_list[other_peer], config.peers[other_peer].encode('hex')))
                 success = False
                 continue
@@ -265,7 +265,7 @@ def check_peers():
         for other_peer in peer_list:
             if other_peer in seen_peers:
                 continue
-            if peer_list[other_peer].decode('hex') == _own_key.pk:
+            if bytes.fromhex(peer_list[other_peer]) == _own_key.pk:
                 own_key_seen = True
                 print("    Peer {} knows me as {} (OK)".format(peer, other_peer))
                 continue

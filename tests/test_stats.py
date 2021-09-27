@@ -30,7 +30,7 @@ from twisted.internet.defer import inlineCallbacks, returnValue
 
 from twistar.registry import Registry
 
-import base
+from . import base
 
 class StatsTest(base.TestBase):
 
@@ -38,7 +38,7 @@ class StatsTest(base.TestBase):
     def test_fixup(self):
         now = time.time()
         c1 = yield Cracker(ip_address="194.109.6.92", first_time=now, latest_time=now, total_reports=0, current_reports=0).save()
-        c2 = yield Cracker(ip_address="192.30.252.128", first_time=now, latest_time=now, total_reports=0, current_reports=0).save()
+        c2 = yield Cracker(ip_address="91.189.88.180", first_time=now, latest_time=now, total_reports=0, current_reports=0).save()
 
         hosts = [c1, c2]
         config.stats_resolve_hostnames = True
@@ -47,8 +47,8 @@ class StatsTest(base.TestBase):
         self.assertEqual(c1.hostname, "www.xs4all.nl", "Reverse DNS of www.xs4all.nl")
         self.assertEqual(c1.country, "Netherlands", "Testing geoip of www.xs4all.nl")
 
-        self.assertEqual(c2.hostname, "github.com", "Reverse DNS of github.com")
-        self.assertEqual(c2.country, "United States", "Testing geoip of github.com")
+        self.assertEqual(c2.hostname, "cactuar.canonical.com", "Reverse DNS of cactuar.canonical.com")
+        self.assertEqual(c2.country, "United Kingdom", "Testing geoip of cactuar.canonical.com")
 
     def stats_settings(self):
         tests_dir = os.path.dirname(inspect.getsourcefile(self.__class__))

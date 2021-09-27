@@ -18,6 +18,7 @@
 import time
 import logging
 import random
+import base64
 
 from twisted.web import server, xmlrpc, error
 from twisted.web.resource import Resource
@@ -44,8 +45,8 @@ class PeeringServer(xmlrpc.XMLRPC):
     def xmlrpc_update(self, request, key, update):
         try:
             logging.info("update({}, {})".format(key, update))
-            key = key.decode('hex')
-            update = update.decode('base64')
+            key = bytes.fromhex(key)
+            update = base64.b64decode(update)
             yield peering.handle_update(key, update)
         except xmlrpc.Fault as e:
             raise e
@@ -59,8 +60,8 @@ class PeeringServer(xmlrpc.XMLRPC):
     def xmlrpc_schema_version(self, request, key, please):
         try:
             logging.info("schema_version({}, {})".format(key, please))
-            key = key.decode('hex')
-            please = please.decode('base64')
+            key = bytes.fromhex(key)
+            please = base64.b64decode(please)
             result = yield peering.handle_schema_version(key, please)
             returnValue(result)
         except xmlrpc.Fault as e:
@@ -74,8 +75,8 @@ class PeeringServer(xmlrpc.XMLRPC):
     def xmlrpc_all_hosts(self, request, key, please):
         try:
             logging.info("all_hosts({}, {})".format(key, please))
-            key = key.decode('hex')
-            please = please.decode('base64')
+            key = bytes.fromhex(key)
+            please = base64.b64decode(please)
             result = yield peering.handle_all_hosts(key, please)
             returnValue(result)
         except xmlrpc.Fault as e:
@@ -89,8 +90,8 @@ class PeeringServer(xmlrpc.XMLRPC):
     def xmlrpc_all_reports_for_host(self, request, key, host):
         try:
             logging.info("all_reports_for_hos({}, {})".format(key, host))
-            key = key.decode('hex')
-            host = host.decode('base64')
+            key = bytes.fromhex(key)
+            host = base64.b64decode(host)
             result = yield peering.handle_all_reports_for_host(key, host)
             returnValue(result)
         except xmlrpc.Fault as e:
@@ -104,8 +105,8 @@ class PeeringServer(xmlrpc.XMLRPC):
     def xmlrpc_dump_table(self, request, key, host):
         try:
             logging.info("dump_table({}, {})".format(key, host))
-            key = key.decode('hex')
-            host = host.decode('base64')
+            key = bytes.fromhex(key)
+            host = base64.b64decode(host)
             result = yield peering.handle_dump_table(key, host)
             returnValue(result)
         except xmlrpc.Fault as e:
@@ -120,8 +121,8 @@ class PeeringServer(xmlrpc.XMLRPC):
         try:
             logging.info("Received list_peers call")
             logging.info("list_peers({}, {})".format(key, please))
-            key = key.decode('hex')
-            please = please.decode('base64')
+            key = bytes.fromhex(key)
+            please = base64.b64decode(please)
             result = peering.list_peers(key, please)
             yield
             returnValue(result)

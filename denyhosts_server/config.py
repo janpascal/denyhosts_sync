@@ -34,7 +34,7 @@ def _gethex(config, section, option, default=None):
     except configparser.NoOptionError:
         result = default
     if result is not None:
-        result = result.decode('hex')
+        result = bytes.fromhex(result)
     return result
 
 def _getint(config, section, option, default=None):
