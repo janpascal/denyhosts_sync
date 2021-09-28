@@ -19,6 +19,8 @@ import logging
 import json
 import os.path
 import sys
+import base64
+import time
 from xmlrpc.client import ServerProxy
 
 from twisted.internet.defer import inlineCallbacks, returnValue
@@ -47,11 +49,11 @@ def send_update(client_ip, timestamp, hosts):
         }
         data_json = json.dumps(data)
         crypted = _peer_boxes[peer].encrypt(data_json)
-        base64 = crypted.encode('base64')
+        mybase64 = base64.b64encode(crypted)
 
         try:
             server = yield deferToThread(ServerProxy, peer)
-            yield deferToThread(server.peering.update, _own_key.pk.encode('hex'), base64)
+            yield deferToThread(server.peering.update, _own_key.pk.hex(), mybase64)
         except:
             logging.warning("Unable to send update to peer {}".format(peer))
 
@@ -62,8 +64,8 @@ def decrypt_message(peer_key, message):
             peer = _peer
             break
     if peer is None:
-        logging.warning("Got message from unknown peer with key {}".format(peer_key.encode('hex')))
-        raise Exception("Unknown key {}".format(peer_key.encode('hex')))
+        logging.warning("Got message from unknown peer with key {}".format(peer_key.hex()))
+        raise Exception("Unknown key {}".format(peer_key.hex()))
 
     # Critical point: use our own key, instead of the one supplied by the peer
     message = _peer_boxes[peer].decrypt(message)
@@ -145,25 +147,25 @@ def handle_dump_table(peer_key, table):
 def list_peers(peer_key, please):
     data = decrypt_message(peer_key, please)
 
-    if data != "please":
+    if data != b"please":
         logging.warning("Request for list_peers is something else than please: {}".format(data))
         raise Exception("Illegal request {}".format(data))
 
     return {
             "server_version": version,
             "peers": {
-                peer: config.peers[peer].encode('hex') 
+                peer: config.peers[peer].hex() 
                 for peer in config.peers
             }
     }
 
 @inlineCallbacks
 def bootstrap_from(peer_url):
-    crypted = _peer_boxes[peer_url].encrypt("please")
-    please_base64 = crypted.encode('base64')
+    crypted = _peer_boxes[peer_url].encrypt(b"please")
+    please_base64 = base64.b64encode(crypted)
 
     server = yield deferToThread(ServerProxy, peer_url)
-    remote_schema = yield server.peering.schema_version(_own_key.pk.encode('hex'), please_base64)
+    remote_schema = yield server.peering.schema_version(_own_key.pk.hex(), please_base64)
 
     print("Initializing database...")
     yield database.clean_database()
@@ -175,7 +177,7 @@ def bootstrap_from(peer_url):
 
     logging.debug("Remote database schema: {}; local schema: {}".format(remote_schema, local_schema))
 
-    hosts = yield deferToThread(server.peering.all_hosts, _own_key.pk.encode('hex'), please_base64)
+    hosts = yield deferToThread(server.peering.all_hosts, _own_key.pk.hex(), please_base64)
 
     #logging.debug("Hosts from peer: {}".format(hosts))
     print("Copying data of {} hosts from peer".format(len(hosts)), end="")
@@ -191,8 +193,8 @@ def bootstrap_from(peer_url):
         host_ip = host[1]
 
         crypted = _peer_boxes[peer_url].encrypt(host_ip)
-        base64 = crypted.encode('base64')
-        response = yield deferToThread(server.peering.all_reports_for_host, _own_key.pk.encode('hex'), base64)
+        mybase64 = base64.b64encode(crypted)
+        response = yield deferToThread(server.peering.all_reports_for_host, _own_key.pk.hex(), mybase64)
         #logging.debug("All reports response: {}".format(response))
 
         for r in response:
@@ -202,8 +204,8 @@ def bootstrap_from(peer_url):
     for table in [ "info", "legacy", "history", "country_history" ]:
         print("Copying {} table from peer...".format(table))
         crypted = _peer_boxes[peer_url].encrypt(table)
-        base64 = crypted.encode('base64')
-        rows = yield deferToThread(server.peering.dump_table, _own_key.pk.encode('hex'), base64)
+        mybase64 = base64.b64encode(crypted)
+        rows = yield deferToThread(server.peering.dump_table, _own_key.pk.hex(), mybase64)
         for row in rows:
             database.bootstrap_table(table, row)
 
@@ -234,8 +236,9 @@ def check_peers():
         print("Examining peer {}...".format(peer))
         peer_server = ServerProxy(peer)
         try:
-            response = peer_server.list_peers(_own_key.pk.encode('hex'), _peer_boxes[peer].encrypt('please').encode('base64'))
+            response = peer_server.list_peers(_own_key.pk.hex(), base64.b64encode(_peer_boxes[peer].encrypt(b'please')))
         except Exception as e:
+            print(e)
             print("Error requesting peer list from {} (maybe it's down, or it doesn't know my key!)".format(peer))
             print("Error message: {}".format(e))
             success = False
@@ -254,7 +257,7 @@ def check_peers():
                 success = False
                 continue
             if config.peers[other_peer] != bytes.fromhex(peer_list[other_peer]):
-                print("    Peer {} knows peer {} but with key {} instead of {}!".format(peer, other_peer, peer_list[other_peer], config.peers[other_peer].encode('hex')))
+                print("    Peer {} knows peer {} but with key {} instead of {}!".format(peer, other_peer, peer_list[other_peer], config.peers[other_peer].hex()))
                 success = False
                 continue
             print("    Common peer (OK): {}".format(other_peer))
