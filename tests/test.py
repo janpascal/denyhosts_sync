@@ -59,6 +59,12 @@ print(s.debug.list_all_hosts())
 print("peer1 all hosts:")
 print(s1.debug.list_all_hosts())
 
+print("peer1 add 1 host:")
+print(s1.add_hosts(["69.192.72.158"]))
+
+print("peer1 all hosts:")
+print(s1.debug.list_all_hosts())
+
 #print("All hosts:")
 #print(s.list_all_hosts())
 # #print(s.dump_database())
