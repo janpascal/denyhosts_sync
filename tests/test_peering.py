@@ -70,7 +70,13 @@ class TestPeering(base.TestBase):
                     server.get_new_hosts(time.time(), 1, [], 3600)
                     is_up = True
                     log.msg("Peer {} is up!".format(peer_url))
-                except:
+                except Exception as e:
+                    log.msg(e)
+                    log.msg("A protocol error occurred")
+                    log.msg("URL: %s" % e.url)
+                    log.msg("HTTP/HTTPS headers: %s" % e.headers)
+                    log.msg("Error code: %d" % e.errcode)
+                    log.msg("Error message: %s" % e.errmsg)
                     time.sleep(0.2)
             if not is_up:
                 # Try to stop the server in case they are started to leave with a clean environment

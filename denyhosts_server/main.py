@@ -154,7 +154,7 @@ def start_listening():
     stats_root = stats_resource
 
     # /RPC2
-    xmlrpc_root.putChild('RPC2', main_xmlrpc_handler)
+    xmlrpc_root.putChild(b"RPC2", main_xmlrpc_handler)
 
     # Peering handler
     p = peering_views.PeeringServer(main_xmlrpc_handler)
@@ -166,9 +166,9 @@ def start_listening():
         main_xmlrpc_handler.putSubHandler('debug', d)
 
     # /static
-    stats_root.putChild('static', web_static)
+    stats_root.putChild(b"static", web_static)
     # /static/graphs
-    web_static.putChild('graphs', web_graphs)
+    web_static.putChild(b"graphs", web_graphs)
 
     logging.info("Start listening on port {}".format(config.xmlrpc_listen_port))
     _xmlrpc_site = server.Site(xmlrpc_root)
