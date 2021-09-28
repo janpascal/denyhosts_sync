@@ -1,12 +1,13 @@
 #!/usr/bin/env python
-import xmlrpc
+
+from xmlrpc.client import ServerProxy
 import time
 import sys
 
 
 server = 'http://localhost:9911'
 print("Connecting to server {}".format(server))
-s = xmlrpc.client.ServerProxy(server)
+s = ServerProxy(server)
 
 #print(s.add_hosts(["127.0.0.3"]))
 #print(s.add_hosts(["192.168.1.22"]))
@@ -47,7 +48,7 @@ print(s.get_new_hosts(time.time()-3600, 1, ["69.192.72.154"], 60))
 
 peer1 = 'http://localhost:9921'
 print("Connecting to server {}".format(peer1))
-s1 = xmlrpc.client.ServerProxy(peer1)
+s1 = ServerProxy(peer1)
 
 print("peer1 new crackers, resilience=60, min_reporters=1") 
 print(s1.get_new_hosts(time.time()-3600, 1, ["69.192.72.154"], 60))
