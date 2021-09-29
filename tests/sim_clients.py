@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import xmlrpclib
+from xmlrpc.client import ServerProxy
 import time
 import threading
 import random
@@ -27,13 +27,13 @@ server = 'http://localhost:9911'
 def run(server, count):
     # Assuming every client will supply 1 new host every 8minutes
     # and ask for newly recognised crackers
-    s = xmlrpclib.ServerProxy(server)
-    for i in xrange(count):
+    s = ServerProxy(server)
+    for i in range(count):
         ip = random_ip_address()
         try:
             s.add_hosts([ip])
             s.get_new_hosts(time.time()-480, 3, [ip], 3600)
-        except Exception, e:
+        except Exception as e:
             print("Got exception {}".format(e))
 
 def run_sim(server, num_threads, count):
@@ -41,16 +41,16 @@ def run_sim(server, num_threads, count):
 
     threads = []
     print("Creating threads...")
-    for i in xrange(num_threads):
+    for i in range(num_threads):
         thread = threading.Thread(target=run, args=(server, count))
         threads.append(thread)
 
     print("Starting threads...")
-    for i in xrange(num_threads):
+    for i in range(num_threads):
         threads[i].start()
 
     #print("Waiting for threads...")
-    for i in xrange(num_threads):
+    for i in range(num_threads):
         threads[i].join()
 
     end_time = time.time()

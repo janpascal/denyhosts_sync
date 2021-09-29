@@ -19,16 +19,16 @@ def run_insert_test(server, num_threads, count, known_crackers):
 
     threads = []
     #print("Creating threads...")
-    for i in xrange(num_threads):
+    for i in range(num_threads):
         thread = threading.Thread(target=run, args=(server, count, known_crackers))
         threads.append(thread)
 
     #print("Starting threads...")
-    for i in xrange(num_threads):
+    for i in range(num_threads):
         threads[i].start()
 
     #print("Waiting for threads...")
-    for i in xrange(num_threads):
+    for i in range(num_threads):
         threads[i].join()
 
     print("Inserting {} hosts {} times took {} seconds".format(count, num_threads, time.time() - start_time))
@@ -36,7 +36,7 @@ def run_insert_test(server, num_threads, count, known_crackers):
 
 
 s = ServerProxy(server)
-for num_threads in xrange(20, 59):
+for num_threads in range(20, 59):
     print("Inserting {} hosts {} times, please wait...".format(100, num_threads))
     s.debug.clear_bulk_cracker_list()
     run_insert_test(server, num_threads, 100, True)
