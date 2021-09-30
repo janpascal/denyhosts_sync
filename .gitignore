@@ -14,8 +14,6 @@ MANIFEST
 htmlcov
 static/graph/*.svg
 static/graph/*.png
-static/css/*.min.css
-static/js/*.min.js
 .venv
 .vscode
 TODO
