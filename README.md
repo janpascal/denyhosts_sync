@@ -21,7 +21,7 @@ and to prevent a single point of failure
 ## Prerequisites
 - MySQL database is preferred for large sites. For testing purposes sqlite is
   also supported
-- Python 2.7 with setuptools
+- Python 3 with setuptools (tested with Python 3.9)
 - The other Python libraries are installed automatically by the setup.py script.
   The GeoIP library needs the libgeoip development headers. On a Debian system,
   install them by running `apt-get install libgeoip-dev`. To install the
@@ -36,9 +36,7 @@ and to prevent a single point of failure
 - `denyhosts-server` is developed and tested on a Debian GNU/Linux system. It should
   work on any Linux system with Python. Microsoft Windows is not a supported
   platform, although it should work without major modifications.
-- On most installations the sqlite3 Python library comes with Python 2.7. If
-  not, you need to install it manually, possibly with using pip:
-  `pip install pysqlite` or, on Debian/Ubuntu, `apt-get install python-pysqlite2`.
+- On most installations the sqlite3 Python library comes with Python 3.
 - If you use a MySQL database, you need to install the appropriate Python
   library. possibly by running `pip install MySQL-python`. On Debian/Ubuntu,
   use `apt-get install python-mysqldb`.
