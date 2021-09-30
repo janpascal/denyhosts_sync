@@ -48,7 +48,7 @@ and to prevent a single point of failure
   libsodium-dev libffi-dev yui-compressor
 
 ## Installation
-Run the following command: `sudo setup.py develop` to download the needed 
+Run the following command: `sudo setup.py install` to download the needed 
 Python libraries. It will install all pre-req python libraries in you local dist-packages location (`/usr/local/lib/python3.9/dist-packages`)
 as well as deploy `denyhosts-server` in you executable location (`/usr/local/bin`)
 
@@ -71,7 +71,7 @@ Simply run `denyhosts-server`. Unless there are unexpected errors, this will giv
 output and the server will just keep running. Configure your DenyHosts clients
 to use the new synchronisation server by setting
 ```
-SYNC_SERVER=http://your.hostname:9911
+SYNC_SERVER=http://your.host.name:9911
 ```
 Once the server is running, you can watch the statistics page at
 `http://your.host.name:9911`. 
