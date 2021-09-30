@@ -41,16 +41,16 @@ and to prevent a single point of failure
 - If you use a MySQL database, you need to install the appropriate Python
   library. possibly by running `pip install MySQL-python`. On Debian/Ubuntu,
   use `apt-get install python-mysqldb`.
-- If you're on a Debian, and possible also Ubuntu system, you'll make your life
-  easier when you install the some packages:
-  apt-get install python-dev python-pip python-setuptools libgeoip-dev \
-  geoip-database libpng-dev libxft-dev python-matplotlib python-twisted \
-  libsodium-dev libffi-dev yui-compressor
+- If you're on a Debian, and possible also Ubuntu system, you can install all pre-requisite like this: `apt install python-is-python3 python3-setuptools libgeoip-dev libsodium23 libpython3.9-dev`
+  
 
 ## Installation
-Run the following command: `sudo setup.py install` to download the needed 
+To do a global installation on your machine:
+- After cloning the repo, go in the root dir of the repo and run the following command: `sudo setup.py install` to download the needed 
 Python libraries. It will install all pre-req python libraries in you local dist-packages location (`/usr/local/lib/python3.9/dist-packages`)
-as well as deploy `denyhosts-server` in you executable location (`/usr/local/bin`)
+as well as deploy `denyhosts-server` in you executable location (`/usr/local/bin`).
+
+If you want to isolate in a virtual environment (make sure you have venv module installed: `apt install python3.9-venv`), run first `python -m venv .venv` and activate your environment (`source .venv/bin/activate`)
 
 
 ## Configuration
