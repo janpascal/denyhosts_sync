@@ -46,7 +46,7 @@ class PeeringServer(xmlrpc.XMLRPC):
         try:
             logging.info("update({}, {})".format(key, update))
             key = bytes.fromhex(key)
-            update = base64.b64decode(update)
+            update = base64.b64decode(update.data)
             yield peering.handle_update(key, update)
         except xmlrpc.Fault as e:
             raise e
@@ -61,7 +61,7 @@ class PeeringServer(xmlrpc.XMLRPC):
         try:
             logging.info("schema_version({}, {})".format(key, please))
             key = bytes.fromhex(key)
-            please = base64.b64decode(please)
+            please = base64.b64decode(please.data)
             result = yield peering.handle_schema_version(key, please)
             returnValue(result)
         except xmlrpc.Fault as e:
@@ -76,7 +76,7 @@ class PeeringServer(xmlrpc.XMLRPC):
         try:
             logging.info("all_hosts({}, {})".format(key, please))
             key = bytes.fromhex(key)
-            please = base64.b64decode(please)
+            please = base64.b64decode(please.data)
             result = yield peering.handle_all_hosts(key, please)
             returnValue(result)
         except xmlrpc.Fault as e:
@@ -89,7 +89,7 @@ class PeeringServer(xmlrpc.XMLRPC):
     @inlineCallbacks
     def xmlrpc_all_reports_for_host(self, request, key, host):
         try:
-            logging.info("all_reports_for_hos({}, {})".format(key, host))
+            logging.info("all_reports_for_host({}, {})".format(key, host))
             key = bytes.fromhex(key)
             host = base64.b64decode(host)
             result = yield peering.handle_all_reports_for_host(key, host)
@@ -122,7 +122,7 @@ class PeeringServer(xmlrpc.XMLRPC):
             logging.info("Received list_peers call")
             logging.info("list_peers({}, {})".format(key, please))
             key = bytes.fromhex(key)
-            please = base64.b64decode(please)
+            please = base64.b64decode(please.data)
             result = peering.list_peers(key, please)
             yield
             returnValue(result)

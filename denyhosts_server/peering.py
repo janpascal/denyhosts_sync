@@ -48,7 +48,7 @@ def send_update(client_ip, timestamp, hosts):
             "hosts": hosts
         }
         data_json = json.dumps(data)
-        crypted = _peer_boxes[peer].encrypt(data_json)
+        crypted = _peer_boxes[peer].encrypt(data_json.encode('utf-8'))
         mybase64 = base64.b64encode(crypted)
 
         try:
@@ -236,7 +236,7 @@ def check_peers():
         print("Examining peer {}...".format(peer))
         peer_server = ServerProxy(peer)
         try:
-            response = peer_server.list_peers(_own_key.pk.hex(), base64.b64encode(_peer_boxes[peer].encrypt(b'please')))
+            response = peer_server.peering.list_peers(_own_key.pk.hex(), base64.b64encode(_peer_boxes[peer].encrypt(b'please')))
         except Exception as e:
             print(e)
             print("Error requesting peer list from {} (maybe it's down, or it doesn't know my key!)".format(peer))

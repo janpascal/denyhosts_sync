@@ -166,9 +166,9 @@ class TestPeering(base.TestBase):
     def test_check_peers_missing(self):
         # check case where one of the peers has an extra peer that I don't know about
         # Remove one of the peers from my list
-        peer_to_remove = config.peers.keys()[0]
-        del config.peers[peer_to_remove]
-        del peering._peer_boxes[peer_to_remove]
+        peer_to_remove = list(config.peers.keys())[0]
+        config.peers.pop(peer_to_remove)
+        peering._peer_boxes.pop(peer_to_remove)
 
         result = peering.check_peers()
         self.assertEqual(result, False, "Check peers should fail if a peer is missing from my own config")
