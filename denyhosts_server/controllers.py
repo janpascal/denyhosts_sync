@@ -100,6 +100,9 @@ def get_qualifying_crackers(min_reports, min_resilience, previous_timestamp,
    
     # This query takes care of conditions (a) and (b)
     # cracker_ids = yield database.runGetPossibleQualifyingCrackerQuery(min_reports, min_resilience, previous_timestamp)
+    # If min_reports is 1, then resiliency value must be discarded
+    if min_reports == 1:
+        min_resilience = 0
     cracker_ids = yield database.run_query("""
             SELECT DISTINCT c.id, c.ip_address 
             FROM crackers c 
