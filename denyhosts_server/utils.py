@@ -16,6 +16,7 @@
 
 import logging
 import ipaddr
+import socket
 
 from twisted.internet.defer import inlineCallbacks, returnValue
 from twisted.internet import reactor, task
@@ -57,5 +58,13 @@ def is_valid_ip_address(ip_address):
         ip.is_link_local):
         return False
     return True
+
+def getIP(d):
+    """
+    This method returns the first IP address string
+    that responds as the given domain name
+    """
+    return socket.gethostbyname(d)
+
 
 # vim: tabstop=8 expandtab shiftwidth=4 softtabstop=4
