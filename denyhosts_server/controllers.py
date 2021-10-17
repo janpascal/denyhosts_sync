@@ -31,30 +31,30 @@ def get_cracker(ip_address):
     return Cracker.find(where=["ip_address=?",ip_address], limit=1)
 
 @inlineCallbacks
-def handle_report_from_client(client_ip, timestamp, hosts):
+def handle_report_from_client(client_ip, timestamp, hosts, trxId=None):
     for cracker_ip in hosts:
         validIP = False
         if not utils.is_valid_ip_address(cracker_ip):
             try:
                 cracker_ip_tentative = utils.getIP(cracker_ip)
-                logging.debug("Tried to convert {} in {}".format(cracker_ip, cracker_ip_tentative))
+                logging.debug("[TrxId:{}] Tried to convert {} in {}".format(trxId, cracker_ip, cracker_ip_tentative))
                 if not utils.is_valid_ip_address(cracker_ip_tentative):
                     # Ignore the malformed ip
-                    logging.warning("Illegal host ip address {} from {} - Ignored".format(cracker_ip, client_ip))
+                    logging.warning("[TrxId:{}] Illegal host ip address {} from {} - Ignored".format(trxId, cracker_ip, client_ip))
                     raise Exception("Illegal IP address \"{}\".".format(cracker_ip))
                 else:
                     validIP = True
-                    logging.info("Illegal host ip address {} converted to {} from {}".format(cracker_ip, cracker_ip_tentative, client_ip))
+                    logging.info("[TrxId:{}] Illegal host ip address {} converted to {} from {}".format(trxId, cracker_ip, cracker_ip_tentative, client_ip))
                     cracker_ip = cracker_ip_tentative
             except Exception:
-                logging.warning("Illegal host ip address {} from {} - Ignored due to exception".format(cracker_ip, client_ip))
+                logging.warning("[TrxId:{}] Illegal host ip address {} from {} - Ignored due to exception".format(trxId, cracker_ip, client_ip))
                 # fail gracefully!
                 pass
         else:
             validIP = True
 
         if validIP:
-            logging.debug("Adding report for {} from {}".format(cracker_ip, client_ip))
+            logging.debug("[TrxId:{}] Adding report for {} from {}".format(trxId, cracker_ip, client_ip))
             yield utils.wait_and_lock_host(cracker_ip)
             try:
                 cracker = yield Cracker.find(where=['ip_address=?', cracker_ip], limit=1)
@@ -62,18 +62,18 @@ def handle_report_from_client(client_ip, timestamp, hosts):
                     cracker = Cracker(ip_address=cracker_ip, first_time=timestamp,
                         latest_time=timestamp, resiliency=0, total_reports=0, current_reports=0)
                     yield cracker.save()
-                yield add_report_to_cracker(cracker, client_ip, when=timestamp)
+                yield add_report_to_cracker(cracker, client_ip, when=timestamp, trxId=trxId)
             finally:
                 utils.unlock_host(cracker_ip)
-            logging.debug("Done adding report for {} from {}".format(cracker_ip,client_ip))
+            logging.debug("[TrxId:{}] Done adding report for {} from {}".format(trxId, cracker_ip,client_ip))
 
 # Note: lock cracker IP first!
 # Report merging algorithm by Anne Bezemer, see 
 # https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=622697
 @inlineCallbacks
-def add_report_to_cracker(cracker, client_ip, when=None):
+def add_report_to_cracker(cracker, client_ip, when=None, trxId=None):
     if when is None:
-        when = time.time()
+        when = int(time.time())
 
     reports = yield Report.find(
         where=["cracker_id=? AND ip_address=?", cracker.id, client_ip], 
@@ -111,7 +111,7 @@ def add_report_to_cracker(cracker, client_ip, when=None):
 
 @inlineCallbacks
 def get_qualifying_crackers(min_reports, min_resilience, previous_timestamp,
-        max_crackers, latest_added_hosts):
+        max_crackers, latest_added_hosts, trxId=None):
     # Thank to Anne Bezemer for the algorithm in this function. 
     # See https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=622697
    
@@ -132,48 +132,48 @@ def get_qualifying_crackers(min_reports, min_resilience, previous_timestamp,
     if cracker_ids is None:
         returnValue([])
 
+    logging.debug("[TrxId:{}] Retrieved {} Crackers from database".format(trxId, len(cracker_ids)))
     # Now look for conditions (c) and (d)
     result = []
     for c in cracker_ids:
         cracker_id = c[0]
         if c[1] in latest_added_hosts:
-            logging.debug("Skipping {}, just reported by client".format(c[1]))
+            logging.debug("[TrxId:{}] Skipping {}, just reported by client".format(trxId, c[1]))
             continue
         cracker = yield Cracker.find(cracker_id)
         if cracker is None:
             continue
-        logging.debug("Examining cracker:")
-        logging.debug(cracker)
+        logging.debug("[TrxId:{}] Examining ".format(trxId)+str(cracker))
         reports = yield cracker.reports.get(orderby="first_report_time ASC")
         #logging.debug("reports:")
         #for r in reports:
-        #    logging.debug("    "+str(r))
-        logging.debug("r[m-1].first, prev: {}, {}".format(reports[min_reports-1].first_report_time, previous_timestamp))
+        #    logging.debug("    "+str(r))q
+        logging.debug("[TrxId:{}] r[m-1].first_report_time={}, previous_timestamp={}".format(trxId, reports[min_reports-1].first_report_time, previous_timestamp))
         if (len(reports)>=min_reports and 
             reports[min_reports-1].first_report_time >= previous_timestamp): 
             # condition (c) satisfied
-            logging.debug("c")
+            logging.debug("[TrxId:{}] condition (c) satisfied - Appending {}".format(trxId, cracker.ip_address))
             result.append(cracker.ip_address)
         else:
-            logging.debug("checking (d)...")
+            logging.debug("[TrxId:{}] checking condition (d)...".format(trxId))
             satisfied = False
             for report in reports:
                 #logging.debug("    "+str(report))
                 if (not satisfied and 
                     report.latest_report_time>=previous_timestamp and
                     report.latest_report_time-cracker.first_time>=min_resilience):
-                    logging.debug("    d1")
+                    logging.debug("[TrxId:{}]     d1".format(trxId))
                     satisfied = True
                 if (report.latest_report_time<=previous_timestamp and 
                     report.latest_report_time-cracker.first_time>=min_resilience):
-                    logging.debug("    d2 failed")
+                    logging.debug("[TrxId:{}]     d2 failed".format(trxId))
                     satisfied = False
                     break
             if satisfied:
-                logging.debug("Appending {}".format(cracker.ip_address))
+                logging.debug("[TrxId:{}] condition (d) satisfied - Appending {}".format(trxId, cracker.ip_address))
                 result.append(cracker.ip_address)
             else:
-                logging.debug("    skipping")
+                logging.debug("[TrxId:{}]     skipping {}".format(trxId, cracker.ip_address))
         if len(result)>=max_crackers:
             break
 
@@ -183,7 +183,7 @@ def get_qualifying_crackers(min_reports, min_resilience, previous_timestamp,
             orderby="retrieved_time DESC", limit=max_crackers-len(result))
         result = result + [extra.ip_address for extra in extras]
 
-    logging.debug("Returning {} hosts".format(len(result)))
+    logging.debug("[TrxId:{}] Returning {} hosts".format(trxId, len(result)))
     returnValue(result)
 
 # Periodical database maintenance
@@ -202,11 +202,11 @@ def perform_maintenance(limit = None, legacy_limit = None):
     logging.info("Starting maintenance job...")
     
     if limit is None:
-        now = time.time()
+        now = int(time.time())
         limit = now - config.expiry_days * 24 * 3600
 
     if legacy_limit is None:
-        now = time.time()
+        now = int(time.time())
         legacy_limit = now - config.legacy_expiry_days * 24 * 3600
 
     reports_deleted = 0
@@ -272,7 +272,7 @@ def download_from_legacy_server():
             logging.ERROR("Illegal timestamp {} from legacy server".format(response["timestamp"]))
         #Registry.DBPOOL.runOperation('UPDATE info SET `value`=%s WHERE `key`="last_legacy_sync"', (str(last_legacy_sync_time),))
         database.run_operation('UPDATE info SET `value`=? WHERE `key`="last_legacy_sync"', str(last_legacy_sync_time))
-        now = time.time()
+        now = int(time.time())
         logging.debug("Got {} hosts from legacy server".format(len(response["hosts"])))
         for host in response["hosts"]:
             legacy = yield Legacy.find(where=["ip_address=?",host], limit=1)

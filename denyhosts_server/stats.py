@@ -104,7 +104,7 @@ def fixup_crackers(hosts):
 def make_daily_graph(txn):
     # Calculate start of daily period: yesterday on the beginning of the
     # current hour
-    now = time.time()
+    now = int(time.time())
     dt_now = datetime.datetime.fromtimestamp(now)
     start_hour = dt_now.hour
     dt_onthehour = dt_now.replace(minute=0, second=0, microsecond=0)
@@ -416,7 +416,7 @@ def update_stats_cache():
     yield update_recent_history()
     yield update_country_history()
 
-    now = time.time()
+    now = int(time.time())
     stats = {}
     stats["last_updated"] = now
     stats["has_hostnames"] = config.stats_resolve_hostnames
@@ -459,7 +459,7 @@ def update_stats_cache():
         if _cache is None:
             _cache = {}
         _cache["stats"] = stats
-        _cache["time"] = time.time()
+        _cache["time"] = int(time.time())
         logging.debug("Finished updating statistics cache...")
     except Exception as e:
         log.err(_why="Error updating statistics: {}".format(e))
@@ -476,7 +476,7 @@ def render_stats():
             logging.debug("No statistics cached yet, waiting for cache generation to finish...")
             yield task.deferLater(reactor, 1, lambda _:0, 0)
 
-    now = time.time()
+    now = int(time.time())
     try:
         env = Environment(loader=FileSystemLoader(config.template_dir))
         env.filters['datetime'] = format_datetime

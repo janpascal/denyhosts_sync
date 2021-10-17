@@ -77,7 +77,7 @@ class DebugServer(xmlrpc.XMLRPC):
                 self._crackers.append(self.random_ip_address())
 
         if when is None:
-            when = time.time()
+            when = int(time.time())
 
         for i in range(count):
             reporter = self.random_ip_address()

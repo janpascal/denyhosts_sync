@@ -59,7 +59,15 @@ class AddHostsTest(base.TestBase):
             
         while self.count < 0:
             yield sleep(0.1)
-        
+
+        yield sleep(60)
+
+        task.deferLater(reactor, 0.01, self.view.xmlrpc_add_hosts, request,ip_list).addCallback(called).addErrback(calledError)
+        self.count -= 1
+            
+        while self.count < 0:
+            yield sleep(0.1)
+
         hosts = yield controllers.get_qualifying_crackers(1, 0, 0, 50, [])
         self.assertEqual(hosts, ['1.2.3.4', '1.1.1.1'], "Wrong number of Crackers in database")
 
