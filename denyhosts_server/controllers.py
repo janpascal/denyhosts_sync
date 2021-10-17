@@ -148,7 +148,7 @@ def get_qualifying_crackers(min_reports, min_resilience, previous_timestamp,
         #logging.debug("reports:")
         #for r in reports:
         #    logging.debug("    "+str(r))q
-        logging.debug("[TrxId:{}] r[m-1].first_report_time={}, previous_timestamp={}".format(trxId, reports[min_reports-1].first_report_time, previous_timestamp))
+        logging.debug("[TrxId:{}] r[m-1].first_report_time={}, previous_timestamp={}, nb={}".format(trxId, reports[min_reports-1].first_report_time, previous_timestamp, len(reports)))
         if (len(reports)>=min_reports and 
             reports[min_reports-1].first_report_time >= previous_timestamp): 
             # condition (c) satisfied
