@@ -127,7 +127,7 @@ class Server(xmlrpc.XMLRPC):
         # Stop the Timer and log trx data
         t.stop()
         logging.info("[TrxId:{0}] get_new_hosts completed in {1:.3f} seconds".format(trxId, t.getElapsed_time()))
-        returnValue( result)
+        returnValue(result)
 
 class WebResource(Resource):
     #isLeaf = True
