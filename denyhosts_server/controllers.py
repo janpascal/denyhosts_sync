@@ -121,7 +121,7 @@ def get_qualifying_crackers(min_reports, min_resilience, previous_timestamp,
     if min_reports == 1:
         min_resilience = 0
     cracker_ids = yield database.run_query("""
-            SELECT DISTINCT c.id, c.ip_address 
+            SELECT DISTINCT c.id, c.ip_address, c.first_time, c.latest_time, c.total_reports, c.current_reports, c.resiliency 
             FROM crackers c 
             WHERE (c.current_reports >= ?)
                 AND (c.resiliency >= ?)
@@ -131,8 +131,27 @@ def get_qualifying_crackers(min_reports, min_resilience, previous_timestamp,
   
     if cracker_ids is None:
         returnValue([])
-
     logging.debug("[TrxId:{}] Retrieved {} Crackers from database".format(trxId, len(cracker_ids)))
+
+    cracker_id_list = []
+    for c in cracker_ids:
+        cracker_id_list.append(c[0])
+
+    report_ids = yield database.run_query("""
+            SELECT DISTINCT r.id, r.cracker_id, r.ip_address, r.first_report_time, r.latest_report_time 
+            FROM reports r 
+            WHERE r.cracker_id in {}
+            ORDER BY r.first_report_time ASC
+            """.format(str(tuple(cracker_id_list))))
+    logging.debug("[TrxId:{}] Retrieved {} reports from database".format(trxId, len(report_ids)))
+    report_dict = {}
+    for r in report_ids:
+        if r[1] not in report_dict:
+            report_dict[r[1]] = []
+        report = Report(id = r[0], cracker_id = r[1], ip_address = r[2], first_report_time = r[3], latest_report_time = r[4])
+        report_dict[r[1]].append(report)
+
+
     # Now look for conditions (c) and (d)
     result = []
     for c in cracker_ids:
@@ -140,11 +159,20 @@ def get_qualifying_crackers(min_reports, min_resilience, previous_timestamp,
         if c[1] in latest_added_hosts:
             logging.debug("[TrxId:{}] Skipping {}, just reported by client".format(trxId, c[1]))
             continue
-        cracker = yield Cracker.find(cracker_id)
+        #The following statement is to be Optimized
+        #cracker = yield Cracker.find(cracker_id)
+        #Now replace by the following statement to avoid one database call
+        cracker = Cracker(id = c[0], ip_address = c[1], first_time = c[2], latest_time = c[3], total_reports = c[4], current_reports = c[5], resiliency = c[6])
         if cracker is None:
             continue
         logging.debug("[TrxId:{}] Examining ".format(trxId)+str(cracker))
-        reports = yield cracker.reports.get(orderby="first_report_time ASC")
+
+        #The following statement is to be Optimized
+        #reports = yield cracker.reports.get(orderby="first_report_time ASC")
+        #Now replace by the following statement to avoid one database call
+        reports = report_dict[cracker.id]
+        #logging.debug("       reports size {}".format(reports))
+        #logging.debug("Shadow reports size {}".format(reports_shadow))
         #logging.debug("reports:")
         #for r in reports:
         #    logging.debug("    "+str(r))q
