@@ -112,6 +112,14 @@ def add_report_to_cracker(cracker, client_ip, when=None, trxId=None):
 @inlineCallbacks
 def get_qualifying_crackers(min_reports, min_resilience, previous_timestamp,
         max_crackers, latest_added_hosts, trxId=None):
+
+    #Start measurement of elapsed time of that function to compare it with the max value (in seconds)
+    #TODO add the MAX value in the config file
+    #That value is set because in the client part the timeout is 30 seconds
+    MAX_TRANSACTION_TIME = 25
+    aTimer = utils.Timer()
+    aTimer.start()
+
     # Thank to Anne Bezemer for the algorithm in this function. 
     # See https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=622697
    
@@ -133,23 +141,24 @@ def get_qualifying_crackers(min_reports, min_resilience, previous_timestamp,
         returnValue([])
     logging.debug("[TrxId:{}] Retrieved {} Crackers from database".format(trxId, len(cracker_ids)))
 
-    cracker_id_list = []
-    for c in cracker_ids:
-        cracker_id_list.append(c[0])
+    # CREATE BIG PERF PROBLEM IN PROD ENVIRONMENT
+    # cracker_id_list = []
+    # for c in cracker_ids:
+    #     cracker_id_list.append(c[0])
 
-    report_ids = yield database.run_query("""
-            SELECT DISTINCT r.id, r.cracker_id, r.ip_address, r.first_report_time, r.latest_report_time 
-            FROM reports r 
-            WHERE r.cracker_id in {}
-            ORDER BY r.first_report_time ASC
-            """.format(str(tuple(cracker_id_list))))
-    logging.debug("[TrxId:{}] Retrieved {} reports from database".format(trxId, len(report_ids)))
-    report_dict = {}
-    for r in report_ids:
-        if r[1] not in report_dict:
-            report_dict[r[1]] = []
-        report = Report(id = r[0], cracker_id = r[1], ip_address = r[2], first_report_time = r[3], latest_report_time = r[4])
-        report_dict[r[1]].append(report)
+    # report_ids = yield database.run_query("""
+    #         SELECT DISTINCT r.id, r.cracker_id, r.ip_address, r.first_report_time, r.latest_report_time 
+    #         FROM reports r 
+    #         WHERE r.cracker_id in {}
+    #         ORDER BY r.first_report_time ASC
+    #         """.format(str(tuple(cracker_id_list))))
+    # logging.debug("[TrxId:{}] Retrieved {} reports from database".format(trxId, len(report_ids)))
+    # report_dict = {}
+    # for r in report_ids:
+    #     if r[1] not in report_dict:
+    #         report_dict[r[1]] = []
+    #     report = Report(id = r[0], cracker_id = r[1], ip_address = r[2], first_report_time = r[3], latest_report_time = r[4])
+    #     report_dict[r[1]].append(report)
 
 
     # Now look for conditions (c) and (d)
@@ -161,16 +170,18 @@ def get_qualifying_crackers(min_reports, min_resilience, previous_timestamp,
             continue
         #The following statement is to be Optimized
         #cracker = yield Cracker.find(cracker_id)
-        #Now replace by the following statement to avoid one database call
+        #OPTIM 1: Now replace by the following statement to avoid one database call
+        ## CREATING PERF PROBLEM ? THIS IS UNCLEAR
         cracker = Cracker(id = c[0], ip_address = c[1], first_time = c[2], latest_time = c[3], total_reports = c[4], current_reports = c[5], resiliency = c[6])
         if cracker is None:
             continue
         logging.debug("[TrxId:{}] Examining ".format(trxId)+str(cracker))
 
         #The following statement is to be Optimized
-        #reports = yield cracker.reports.get(orderby="first_report_time ASC")
+        reports = yield cracker.reports.get(orderby="first_report_time ASC")
         #Now replace by the following statement to avoid one database call
-        reports = report_dict[cracker.id]
+        #OPTIM 2: WAS FINALLY REMOVED AS PERF WERE NOT GOOD AT ALL
+        #reports = report_dict[cracker.id]
         #logging.debug("       reports size {}".format(reports))
         #logging.debug("Shadow reports size {}".format(reports_shadow))
         #logging.debug("reports:")
@@ -202,7 +213,8 @@ def get_qualifying_crackers(min_reports, min_resilience, previous_timestamp,
                 result.append(cracker.ip_address)
             else:
                 logging.debug("[TrxId:{}]     skipping {}".format(trxId, cracker.ip_address))
-        if len(result)>=max_crackers:
+        if (aTimer.getOngoing_time()>MAX_TRANSACTION_TIME or 
+            len(result)>=max_crackers):
             break
 
     if len(result) < max_crackers:

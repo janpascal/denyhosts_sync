@@ -108,5 +108,9 @@ class Timer:
         self._start_time = None
         self._stop_time = None
         return elapsed_time
+    
+    def getOngoing_time(self):
+        ongoing_time = time.perf_counter() - self._start_time
+        return ongoing_time
 
 # vim: tabstop=8 expandtab shiftwidth=4 softtabstop=4
