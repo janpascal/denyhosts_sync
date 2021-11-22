@@ -53,10 +53,13 @@ class Server(xmlrpc.XMLRPC):
             remote_ip = x_real_ip[0] if x_real_ip else request.getClientIP()
             now = int(time.time())
 
-            logging.info("[TrxId:{}] add_hosts({}) from {}".format(trxId, hosts, remote_ip))
-            yield controllers.handle_report_from_client(remote_ip, now, hosts, trxId)
+            #Cleanup of the input as I have observed some dupe inputs creating overload on the db side
+            hosts_uniq = sorted(set(hosts))
+            nb_prune = len(hosts) - len(hosts_uniq)
+            logging.info("[TrxId:{}] add_hosts({}) compacted by {} from {}".format(trxId, hosts_uniq, nb_prune, remote_ip))
+            yield controllers.handle_report_from_client(remote_ip, now, hosts_uniq, trxId)
             try:
-                yield peering.send_update(remote_ip, now, hosts)
+                yield peering.send_update(remote_ip, now, hosts_uniq)
             except xmlrpc.Fault as e:
                 raise e
             except Exception as e:
