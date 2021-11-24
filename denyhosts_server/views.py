@@ -129,7 +129,7 @@ class Server(xmlrpc.XMLRPC):
 
         # Stop the Timer and log trx data
         t.stop()
-        logging.info("[TrxId:{0}] get_new_hosts completed in {1:.3f} seconds".format(trxId, t.getElapsed_time()))
+        logging.info("[TrxId:{0}] get_new_hosts completed in {1:.3f} seconds returning {2} hosts".format(trxId, t.getElapsed_time(), len(result['hosts'])))
         returnValue(result)
 
 class WebResource(Resource):

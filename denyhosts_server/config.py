@@ -62,6 +62,7 @@ def read_config(filename):
     global dbtype, dbparams
     global maintenance_interval, expiry_days, legacy_expiry_days
     global max_reported_crackers
+    global max_processing_time_get_new_hosts
     global logfile
     global loglevel
     global xmlrpc_listen_port
@@ -113,6 +114,8 @@ def read_config(filename):
     legacy_expiry_days = _getfloat(_config, "maintenance", "legacy_expiry_days", 30)
 
     max_reported_crackers = _getint(_config, "sync", "max_reported_crackers", 50)
+    #That default value is set because in the client part the timeout is 30 seconds
+    max_processing_time_get_new_hosts  = _getint(_config, "sync", "max_processing_time_get_new_hosts", 28)
     xmlrpc_listen_port = _getint(_config, "sync", "listen_port", 9911)
     enable_debug_methods = _getboolean(_config, "sync", "enable_debug_methods", False)
     legacy_server = _get(_config, "sync", "legacy_server", None)

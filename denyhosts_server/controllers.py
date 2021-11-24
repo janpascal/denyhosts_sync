@@ -113,10 +113,7 @@ def add_report_to_cracker(cracker, client_ip, when=None, trxId=None):
 def get_qualifying_crackers(min_reports, min_resilience, previous_timestamp,
         max_crackers, latest_added_hosts, trxId=None):
 
-    #Start measurement of elapsed time of that function to compare it with the max value (in seconds)
-    #TODO add the MAX value in the config file
-    #That value is set because in the client part the timeout is 30 seconds
-    MAX_TRANSACTION_TIME = 25
+    #Start measurement of elapsed time of that function to compare it with the max value (in seconds) from the config file
     aTimer = utils.Timer()
     aTimer.start()
 
@@ -213,7 +210,7 @@ def get_qualifying_crackers(min_reports, min_resilience, previous_timestamp,
                 result.append(cracker.ip_address)
             else:
                 logging.debug("[TrxId:{}]     skipping {}".format(trxId, cracker.ip_address))
-        if (aTimer.getOngoing_time()>MAX_TRANSACTION_TIME or 
+        if (aTimer.getOngoing_time()>config.max_processing_time_get_new_hosts or 
             len(result)>=max_crackers):
             break
 
