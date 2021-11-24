@@ -120,7 +120,7 @@ class Server(xmlrpc.XMLRPC):
             result['hosts'] = yield controllers.get_qualifying_crackers(
                     threshold, resiliency, timestamp, 
                     config.max_reported_crackers, set(hosts_added), trxId)
-            logging.debug("[TrxId:{}] returning: {}".format(trxId, result))
+            logging.debug("[TrxId:{}] get_new_hosts returning: {}".format(trxId, result))
         except xmlrpc.Fault as e:
             raise e
         except Exception as e:
