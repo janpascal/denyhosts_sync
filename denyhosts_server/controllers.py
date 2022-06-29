@@ -112,6 +112,11 @@ def add_report_to_cracker(cracker, client_ip, when=None, trxId=None):
 @inlineCallbacks
 def get_qualifying_crackers(min_reports, min_resilience, previous_timestamp,
         max_crackers, latest_added_hosts, trxId=None):
+
+    #Start measurement of elapsed time of that function to compare it with the max value (in seconds) from the config file
+    aTimer = utils.Timer()
+    aTimer.start()
+
     # Thank to Anne Bezemer for the algorithm in this function. 
     # See https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=622697
    
@@ -121,7 +126,7 @@ def get_qualifying_crackers(min_reports, min_resilience, previous_timestamp,
     if min_reports == 1:
         min_resilience = 0
     cracker_ids = yield database.run_query("""
-            SELECT DISTINCT c.id, c.ip_address 
+            SELECT DISTINCT c.id, c.ip_address, c.first_time, c.latest_time, c.total_reports, c.current_reports, c.resiliency 
             FROM crackers c 
             WHERE (c.current_reports >= ?)
                 AND (c.resiliency >= ?)
@@ -131,8 +136,8 @@ def get_qualifying_crackers(min_reports, min_resilience, previous_timestamp,
   
     if cracker_ids is None:
         returnValue([])
-
     logging.debug("[TrxId:{}] Retrieved {} Crackers from database".format(trxId, len(cracker_ids)))
+
     # Now look for conditions (c) and (d)
     result = []
     for c in cracker_ids:
@@ -140,14 +145,14 @@ def get_qualifying_crackers(min_reports, min_resilience, previous_timestamp,
         if c[1] in latest_added_hosts:
             logging.debug("[TrxId:{}] Skipping {}, just reported by client".format(trxId, c[1]))
             continue
-        cracker = yield Cracker.find(cracker_id)
+
+        cracker = Cracker(id = c[0], ip_address = c[1], first_time = c[2], latest_time = c[3], total_reports = c[4], current_reports = c[5], resiliency = c[6])
         if cracker is None:
             continue
         logging.debug("[TrxId:{}] Examining ".format(trxId)+str(cracker))
+
+        #The following statement is to be Optimized
         reports = yield cracker.reports.get(orderby="first_report_time ASC")
-        #logging.debug("reports:")
-        #for r in reports:
-        #    logging.debug("    "+str(r))q
         logging.debug("[TrxId:{}] r[m-1].first_report_time={}, previous_timestamp={}, nb={}".format(trxId, reports[min_reports-1].first_report_time, previous_timestamp, len(reports)))
         if (len(reports)>=min_reports and 
             reports[min_reports-1].first_report_time >= previous_timestamp): 
@@ -158,7 +163,6 @@ def get_qualifying_crackers(min_reports, min_resilience, previous_timestamp,
             logging.debug("[TrxId:{}] checking condition (d)...".format(trxId))
             satisfied = False
             for report in reports:
-                #logging.debug("    "+str(report))
                 if (not satisfied and 
                     report.latest_report_time>=previous_timestamp and
                     report.latest_report_time-cracker.first_time>=min_resilience):
@@ -174,7 +178,8 @@ def get_qualifying_crackers(min_reports, min_resilience, previous_timestamp,
                 result.append(cracker.ip_address)
             else:
                 logging.debug("[TrxId:{}]     skipping {}".format(trxId, cracker.ip_address))
-        if len(result)>=max_crackers:
+        if (aTimer.getOngoing_time()>config.max_processing_time_get_new_hosts or 
+            len(result)>=max_crackers):
             break
 
     if len(result) < max_crackers:

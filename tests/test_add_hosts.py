@@ -117,4 +117,28 @@ class AddHostsTest(base.TestBase):
             yield sleep(0.1)
         
         hosts = yield controllers.get_qualifying_crackers(1, 0, 0, 50, [])
-        self.assertEqual(hosts, ['78.42.91.125', '6.89.34.25', '185.220.102.248'], "Wrong number of Crackers in database")
+        self.assertEqual(hosts, ['185.220.102.248', '78.42.91.125', '6.89.34.25', ], "Wrong number of Crackers in database")
+    
+    @inlineCallbacks
+    def test_add_hosts_ByName_With_Dupe(self):
+        self.view = views.Server()
+        request = MockRequest("11.12.44.75")
+
+        self.count = 0
+        def called(result):
+            self.count += 1
+
+        def calledError(result):
+            print("Error")
+            self.count += 1
+
+        ip_list = ['ec2-161-189-70-219.cn-northwest-1.compute.amazonaws.com.cn', 'static.28.30.55.162.clients.your-server.de', 'ec2-161-189-70-219.cn-northwest-1.compute.amazonaws.com.cn']
+
+        task.deferLater(reactor, 0.01, self.view.xmlrpc_add_hosts, request,ip_list).addCallback(called).addErrback(calledError)
+        self.count -= 1
+            
+        while self.count < 0:
+            yield sleep(0.1)
+        
+        hosts = yield controllers.get_qualifying_crackers(1, 0, 0, 50, [])
+        self.assertEqual(hosts, ['162.55.30.28', '161.189.70.219'], "Wrong number of Crackers in database")

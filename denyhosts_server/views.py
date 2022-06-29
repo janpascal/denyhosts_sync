@@ -53,10 +53,13 @@ class Server(xmlrpc.XMLRPC):
             remote_ip = x_real_ip[0] if x_real_ip else request.getClientIP()
             now = int(time.time())
 
-            logging.info("[TrxId:{}] add_hosts({}) from {}".format(trxId, hosts, remote_ip))
-            yield controllers.handle_report_from_client(remote_ip, now, hosts, trxId)
+            #Cleanup of the input as I have observed some dupe inputs creating overload on the db side
+            hosts_uniq = sorted(set(hosts))
+            nb_prune = len(hosts) - len(hosts_uniq)
+            logging.info("[TrxId:{}] add_hosts({}) compacted by {} from {}".format(trxId, hosts_uniq, nb_prune, remote_ip))
+            yield controllers.handle_report_from_client(remote_ip, now, hosts_uniq, trxId)
             try:
-                yield peering.send_update(remote_ip, now, hosts)
+                yield peering.send_update(remote_ip, now, hosts_uniq)
             except xmlrpc.Fault as e:
                 raise e
             except Exception as e:
@@ -117,7 +120,7 @@ class Server(xmlrpc.XMLRPC):
             result['hosts'] = yield controllers.get_qualifying_crackers(
                     threshold, resiliency, timestamp, 
                     config.max_reported_crackers, set(hosts_added), trxId)
-            logging.debug("[TrxId:{}] returning: {}".format(trxId, result))
+            logging.debug("[TrxId:{}] get_new_hosts returning: {}".format(trxId, result))
         except xmlrpc.Fault as e:
             raise e
         except Exception as e:
@@ -126,7 +129,7 @@ class Server(xmlrpc.XMLRPC):
 
         # Stop the Timer and log trx data
         t.stop()
-        logging.info("[TrxId:{0}] get_new_hosts completed in {1:.3f} seconds".format(trxId, t.getElapsed_time()))
+        logging.info("[TrxId:{0}] get_new_hosts completed in {1:.3f} seconds returning {2} hosts".format(trxId, t.getElapsed_time(), len(result['hosts'])))
         returnValue(result)
 
 class WebResource(Resource):
