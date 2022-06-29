@@ -23,7 +23,7 @@ from denyhosts_server.models import Cracker, Report
 
 from twisted.internet.defer import inlineCallbacks, returnValue
 
-import base
+from . import base
 import logging
 
 class GetNewHostsTest(base.TestBase):
