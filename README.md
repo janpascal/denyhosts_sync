@@ -17,13 +17,15 @@ of `denyhosts`.
 - Dynamically generated statistics web page
 - Peering mode: multiple servers can shared their information for load-balancing
 and to prevent a single point of failure
+- `denyhosts-server` is developed and tested on a Debian GNU/Linux system. It should
+  work on any Linux system with Python. Microsoft Windows is not a supported
+  platform, although it should work without major modifications.
 
 ## Prerequisites
 - MySQL database is preferred for large sites. For testing purposes sqlite is
   also supported
-- Python 2.7 with setuptools
-- The other Python libraries are installed automatically by the setup.py script.
-  The GeoIP library needs the libgeoip development headers. On a Debian system,
+- Python 3 with setuptools (tested with Python 3.9). On an Ubuntu 21.04 system, run `apt install python-is-python3 python3-setuptools`
+-  The GeoIP library needs the libgeoip development headers. On a Debian system,
   install them by running `apt-get install libgeoip-dev`. To install the
   free GeoIP database, run `apt-get install geoip-database`.
   Note: To install the Python GeoIP library on FreeBSD, edit your
@@ -33,38 +35,36 @@ and to prevent a single point of failure
   include_dirs=/usr/local/include
   library_dirs=/usr/local/lib
   ```
-- `denyhosts-server` is developed and tested on a Debian GNU/Linux system. It should
-  work on any Linux system with Python. Microsoft Windows is not a supported
-  platform, although it should work without major modifications.
-- On most installations the sqlite3 Python library comes with Python 2.7. If
-  not, you need to install it manually, possibly with using pip:
-  `pip install pysqlite` or, on Debian/Ubuntu, `apt-get install python-pysqlite2`.
+- The libnacl used to manage encryption key relies on libsodium. Make sure you install it. On a Ubuntu system, run `apt install libsodium23`.
+- The other Python libraries will be installed automatically by the setup.py script.
+- On most installations the sqlite3 Python library comes with Python 3.
 - If you use a MySQL database, you need to install the appropriate Python
   library. possibly by running `pip install MySQL-python`. On Debian/Ubuntu,
   use `apt-get install python-mysqldb`.
-- If you're on a Debian, and possible also Ubuntu system, you'll make your life
-  easier when you install the some packages:
-  apt-get install python-dev python-pip python-setuptools libgeoip-dev \
-  geoip-database libpng-dev libxft-dev python-matplotlib python-twisted \
-  libsodium-dev libffi-dev yui-compressor
+- If you're on a Debian, and possible also Ubuntu system, you can install all pre-requisite like this: `apt install python-is-python3 python3-setuptools libgeoip-dev libsodium23 libpython3.9-dev`
+  
 
 ## Installation
-Run the following command: `sudo setup.py develop` to download the needed 
-Python libraries. Then run `sudo setup.py minify_js minify_css install` to
-minify the used JavaScript and CSS libraries, install the Python scripts 
-onto your system (usually in `/usr/local/lib/python2.7/dist-packages`) 
-and the Python script `/usr/local/bin/denyhosts-server`.
+To do a global installation on your machine:
+- After cloning the repo, go in the root dir of the repo and run the following command: `sudo setup.py install` to download the needed 
+Python libraries. It will install all pre-req python libraries in you local dist-packages location (`/usr/local/lib/python3.9/dist-packages`)
+as well as deploy `denyhosts-server` in you executable location (`/usr/local/bin`).
+
+If you want to isolate in a virtual environment (make sure you have venv module installed: `apt install python3.9-venv`), run first `python -m venv .venv` and activate your environment (`source .venv/bin/activate`)
+
 
 ## Configuration
-Create the database and a database user with full rights to it. Copy the
-`denyhosts-server.conf.example` file to `/etc/denyhosts-server.conf` and edit it.
+- Create the database and a database user with full rights to it.
+- Copy the `denyhosts-server.conf.example` file to `/etc/denyhosts-server.conf` and edit it.
 Fill in the database parameters, the location of the log file (which should be
 writable by the system user that will be running denyhosts-server) and
 other settings you wish to change. `graph_dir` in the `stats` sections is
 another location that should be writable by `denyhosts-server`.
-
-Prepare the database for first use with the command `denyhosts-server
---recreate-database`. This will create the tables needed by denyhosts-server.
+- If you haven change the default logging configuration, make sure `/var/log/denyhosts-server` is created and write accessible
+from the user running `denyhosts-server`
+- If you haven change the default logging configuration, make sure `/var/lib/denyhosts-server` is created and write accessible
+from the user running `denyhosts-server`
+- Prepare the database for first use with the command `denyhosts-server --recreate-database`. This will create the tables needed by denyhosts-server.
 
 ## Running denyhosts-server
 Simply run `denyhosts-server`. Unless there are unexpected errors, this will give no

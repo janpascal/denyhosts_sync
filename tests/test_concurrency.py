@@ -8,7 +8,7 @@ from denyhosts_server.models import Cracker, Report
 from twisted.internet import reactor,defer,task
 from twisted.internet.defer import inlineCallbacks, returnValue
 
-import base
+from . import base
 
 def random_ip_address():
     return ".".join(map(str, (random.randint(0, 255) for _ in range(4))))
@@ -40,6 +40,7 @@ class ConcurrencyTest(base.TestBase):
     def test_try_and_confuse_server(self):
         self.view = views.Server()
         request = MockRequest("127.0.0.1")
+        print("")
         for i in range(0, 25):
             print("count:{}".format(i))
 

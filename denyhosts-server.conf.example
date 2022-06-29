@@ -43,6 +43,11 @@
 # denyhosts clients per sync. Default: 50
 #max_reported_crackers: 50
 
+#Maximum processing time of the get_New_Hosts service. The timeout value is set to 30seonds on the cliend side so any answer after that would be ignored.
+#Also, without capping, the database is so huge that building the list can go super high (several minutes)
+#Default: 28
+#max_processing_time_get_new_hosts: 28
+
 # TCP port to listen on. Default: 9911
 #listen_port: 9911
 

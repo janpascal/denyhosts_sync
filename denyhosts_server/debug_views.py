@@ -24,11 +24,11 @@ from twisted.internet.defer import inlineCallbacks, returnValue
 from twisted.internet import reactor
 import ipaddr
 
-import models
-from models import Cracker, Report
-import config
-import controllers
-import utils
+from . import models
+from .models import Cracker, Report
+from . import config
+from . import controllers
+from . import utils
 
 class DebugServer(xmlrpc.XMLRPC):
     """
@@ -73,13 +73,13 @@ class DebugServer(xmlrpc.XMLRPC):
     def xmlrpc_test_bulk_insert(self, count, same_crackers = False, when=None):
         if same_crackers and len(self._crackers) < count:
             logging.debug("Filling static crackers from {} to {}".format(len(self._crackers), count))
-            for i in xrange(len(self._crackers), count):
+            for i in range(len(self._crackers), count):
                 self._crackers.append(self.random_ip_address())
 
         if when is None:
-            when = time.time()
+            when = int(time.time())
 
-        for i in xrange(count):
+        for i in range(count):
             reporter = self.random_ip_address()
             if same_crackers:
                 cracker_ip = self._crackers[i]

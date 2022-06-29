@@ -20,8 +20,9 @@ import os.path
 import signal
 import time
 import subprocess
-import xmlrpclib
-from xmlrpclib import ServerProxy
+import base64
+
+from xmlrpc.client import ProtocolError, ServerProxy
 
 from denyhosts_server import config
 from denyhosts_server import models
@@ -38,7 +39,7 @@ from  twisted.python import log
 import libnacl.public
 import libnacl.utils
 
-import base
+from . import base
 import logging
 
 
@@ -70,9 +71,21 @@ class TestPeering(base.TestBase):
                     server.get_new_hosts(time.time(), 1, [], 3600)
                     is_up = True
                     log.msg("Peer {} is up!".format(peer_url))
-                except:
+                except ProtocolError as e:
+                    log.msg(e)
+                    log.msg("A protocol error occurred")
+                    log.msg("URL: %s" % e.url)
+                    log.msg("HTTP/HTTPS headers: %s" % e.headers)
+                    log.msg("Error code: %d" % e.errcode)
+                    log.msg("Error message: %s" % e.errmsg)
+                    time.sleep(0.2)
+                except Exception as e:
+                    log.msg(e)
+                    log.msg("Generic error occurred")
                     time.sleep(0.2)
             if not is_up:
+                # Try to stop the server in case they are started to leave with a clean environment
+                self.tearDown()
                 self.fail("Failed to start peer {}".format(peer_url))
 
     def tearDown(self):
@@ -107,8 +120,8 @@ class TestPeering(base.TestBase):
             "hosts": ["1.1.1.1"]
         }
         data_json = json.dumps(data)
-        crypted = box.encrypt(data_json)
-        base64 = crypted.encode('base64')
+        crypted = box.encrypt(data_json.encode())
+        mybase64 = base64.b64encode(crypted)
         yield peering.handle_update(public_key, crypted)
 
     def _insert_peer(self):
@@ -134,7 +147,7 @@ class TestPeering(base.TestBase):
     def test_list_peers(self):
         peer_keypair = self._insert_peer()
         box = libnacl.public.Box(peer_keypair.sk, peering._own_key.pk)
-        please = box.encrypt("please")
+        please = box.encrypt(b"please")
         response = yield peering.list_peers(peer_keypair.pk, please)
         log.msg(response)
         peer_list = response["peers"]
@@ -142,7 +155,7 @@ class TestPeering(base.TestBase):
         self.assertEqual(response["server_version"], server_version, "Incorrect server version in response")
         for peer_url in config.peers:
             self.assertIn(peer_url, peer_list, "Peer missing from received list")
-            self.assertEqual(config.peers[peer_url].encode('hex'), peer_list[peer_url], "Wrong key in received peer list")
+            self.assertEqual(config.peers[peer_url].hex(), peer_list[peer_url], "Wrong key in received peer list")
 
     def test_check_peers(self):
         result = peering.check_peers()
@@ -153,9 +166,9 @@ class TestPeering(base.TestBase):
     def test_check_peers_missing(self):
         # check case where one of the peers has an extra peer that I don't know about
         # Remove one of the peers from my list
-        peer_to_remove = config.peers.keys()[0]
-        del config.peers[peer_to_remove]
-        del peering._peer_boxes[peer_to_remove]
+        peer_to_remove = list(config.peers.keys())[0]
+        config.peers.pop(peer_to_remove)
+        peering._peer_boxes.pop(peer_to_remove)
 
         result = peering.check_peers()
         self.assertEqual(result, False, "Check peers should fail if a peer is missing from my own config")

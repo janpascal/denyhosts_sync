@@ -23,14 +23,14 @@ class Cracker(DBObject):
     column_names=['ip_address','first_time', 'latest_time', 'resiliency', 'total_reports', 'current_reports']
 
     def __str__(self):
-        return "Cracker({},{},{},{},{},{})".format(self.id,self.ip_address,self.first_time,self.latest_time,self.resiliency,self.total_reports,self.current_reports)
+        return "Cracker(id={},ip={},first_time={},latest_time={},resiliency={},total_reports={},current_reports={})".format(self.id,self.ip_address,self.first_time,self.latest_time,self.resiliency,self.total_reports,self.current_reports)
 
 class Report(DBObject):
     BELONGSTO=['cracker']
     column_names=['ip_address','first_report_time', 'latest_report_time']
 
     def __str__(self):
-        return "Report({},{},{},{})".format(self.id,self.ip_address,self.first_report_time,self.latest_report_time)
+        return "Report(id={},ip={},first_report_time={},latest_report_time={})".format(self.id,self.ip_address,self.first_report_time,self.latest_report_time)
 
 class Legacy(DBObject):
     TABLENAME="legacy"

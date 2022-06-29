@@ -1,0 +1,8 @@
+configparser
+twisted
+twistar
+ipaddr
+jinja2
+matplotlib
+geoip
+libnacl
